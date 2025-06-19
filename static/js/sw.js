@@ -1,23 +1,36 @@
-const CACHE_NAME = 'smartreminder-v2';
-const urlsToCache = [
+const CACHE_NAME = 'smartreminder-v3';
+const STATIC_CACHE = 'static-v3';
+const DYNAMIC_CACHE = 'dynamic-v3';
+
+const STATIC_FILES = [
     '/',
+    '/offline',
     '/static/css/style.css',
     '/static/js/app.js',
     '/static/js/main.js',
     '/static/js/notes.js',
     '/static/js/reminders.js',
+    '/static/manifest.json',
     '/static/icons/favicon.ico',
+    '/static/icons/icon-72x72.png',
+    '/static/icons/icon-96x96.png',
+    '/static/icons/icon-128x128.png',
+    '/static/icons/icon-144x144.png',
+    '/static/icons/icon-152x152.png',
     '/static/icons/icon-192x192.png',
+    '/static/icons/icon-384x384.png',
     '/static/icons/icon-512x512.png',
-    '/offline'
+    'https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css',
+    'https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js'
 ];
 
 self.addEventListener('install', function(event) {
+    console.log('[Service Worker] Installing Service Worker...', event);
     event.waitUntil(
-        caches.open(CACHE_NAME)
+        caches.open(STATIC_CACHE)
             .then(function(cache) {
-                console.log('Opened cache');
-                return cache.addAll(urlsToCache);
+                console.log('[Service Worker] Pre-caching static files');
+                return cache.addAll(STATIC_FILES);
             })
     );
 });
@@ -37,26 +50,46 @@ self.addEventListener('activate', function(event) {
 });
 
 self.addEventListener('fetch', function(event) {
+    // Skip cross-origin requests
+    if (!event.request.url.startsWith(self.location.origin) && 
+        !event.request.url.includes('bootstrap')) {
+        return;
+    }
+
     event.respondWith(
         caches.match(event.request)
             .then(function(response) {
-                // Cache hit - return response
                 if (response) {
                     return response;
                 }
                 
-                return fetch(event.request).then(
-                    function(response) {
+                return fetch(event.request)
+                    .then(function(res) {
                         // Check if we received a valid response
-                        if(!response || response.status !== 200 || response.type !== 'basic') {
-                            return response;
+                        if(!res || res.status !== 200) {
+                            if (event.request.headers.get('accept').includes('text/html')) {
+                                return caches.match('/offline');
+                            }
+                            return res;
                         }
 
-                        // Clone the response
-                        var responseToCache = response.clone();
-
-                        caches.open(CACHE_NAME)
+                        return caches.open(DYNAMIC_CACHE)
                             .then(function(cache) {
+                                // Put a copy in dynamic cache
+                                if (!event.request.url.includes('chrome-extension')) {
+                                    cache.put(event.request.url, res.clone());
+                                }
+                                return res;
+                            });
+                    })
+                    .catch(function(err) {
+                        if (event.request.headers.get('accept').includes('text/html')) {
+                            return caches.match('/offline');
+                        }
+                    });
+            })
+    );
+                    });
                                 cache.put(event.request, responseToCache);
                             });
 
