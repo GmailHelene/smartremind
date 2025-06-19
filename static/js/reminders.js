@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Error loading reminders:', error);
                 remindersLoading.classList.add('d-none');
-                noReminders.querySelector('p').textContent = 'Error loading reminders. Please try again.';
+                noReminders.querySelector('p').textContent = 'Kunne ikke laste inn påminnelser. Vennligst prøv igjen.';
                 noReminders.classList.remove('d-none');
             });
     }

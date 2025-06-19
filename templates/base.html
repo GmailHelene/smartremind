@@ -47,12 +47,11 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#" id="modeDropdown" role="button" data-bs-toggle="dropdown">
+                <ul class="navbar-nav ms-auto">                    <li class="nav-item dropdown">                        <a class="nav-link dropdown-toggle" href="#" id="modeDropdown" role="button" data-bs-toggle="dropdown">
                             Modus: <span id="current-mode">{{ app_mode|default('Standard') }}</span>
                         </a>
                         <ul class="dropdown-menu" id="mode-selector">
-                            <form id="mode-form" style="display: none" method="POST" action="{{ url_for('settings') }}">
+                            <form id="mode-form" method="POST" action="{{ url_for('set_mode') }}">
                                 {{ csrf_token() }}
                                 <input type="hidden" name="app_mode" id="app_mode_input">
                             </form>

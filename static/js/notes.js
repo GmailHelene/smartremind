@@ -99,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(error => {
                 console.error('Error loading notes:', error);
                 notesLoading.classList.add('d-none');
-                noNotes.querySelector('p').textContent = 'Error loading notes. Please try again.';
+                noNotes.querySelector('p').textContent = 'Kunne ikke laste inn notater. Vennligst prøv igjen.';
                 noNotes.classList.remove('d-none');
             });
     }
