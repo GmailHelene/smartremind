@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Felles Notater - Smart Påminner Pro{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center">
+            <h1 class="mb-0">Felles Notater</h1>
+            <div>
+                <a href="{{ url_for('create_shared_note') }}" class="btn btn-primary">
+                    <i class="fas fa-plus-circle"></i> Nytt Notat
+                </a>
+                <a href="{{ url_for('join_shared_note') }}" class="btn btn-outline-primary">
+                    <i class="fas fa-link"></i> Bli Med
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    {% if notes %}
+        {% for note in notes %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">{{ note.title }}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text text-truncate">
+                        {{ note.content if note.content else 'Ingen innhold ennå...' }}
+                    </p>
+                    <p class="small text-muted">
+                        <i class="fas fa-users"></i> {{ note.members|length }} deltakere
+                        <br>
+                        <i class="fas fa-clock"></i> Sist oppdatert: {{ note.updated_at|as_datetime }}
+                    </p>
+                </div>
+                <div class="card-footer bg-light">
+                    <a href="{{ url_for('view_shared_note', note_id=note.id) }}" class="btn btn-sm btn-primary w-100">
+                        <i class="fas fa-eye"></i> Åpne Notat
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                <p class="mb-0">Du har ingen felles notater ennå. Opprett et nytt notat eller bli med i et eksisterende notat.</p>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

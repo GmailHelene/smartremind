@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Påminnelse</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #dc3545;">🔔 Påminnelse!</h2>
+        
+        <p>Hei!</p>
+        
+        <p>Du har en påminnelse som snart forfaller:</p>
+        
+        <div style="background: #fff3cd; border: 1px solid #ffeaa7; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #856404;">{{ reminder.title }}</h3>
+            {% if reminder.description %}
+            <p><strong>Beskrivelse:</strong> {{ reminder.description }}</p>
+            {% endif %}
+            <p><strong>Tid:</strong> {{ reminder.datetime }}</p>
+            <p><strong>Prioritet:</strong> {{ reminder.priority }}</p>
+        </div>
+        
+        <p style="color: #dc3545;"><strong>Husk å gjøre det du har planlagt!</strong></p>
+        
+        <hr style="margin: 30px 0;">
+        <p style="font-size: 12px; color: #666;">
+            Dette er en automatisk påminnelse fra Smart Påminner Pro.<br>
+            Ikke svar på denne e-posten.
+        </p>
+    </div>
+</body>
+</html>

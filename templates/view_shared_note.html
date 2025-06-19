@@ -1,0 +1,140 @@
+<!-- filepath: c:\Users\helen\Desktop\SmartReminder-main\templates\view_shared_note.html -->
+{% extends "base.html" %}
+
+{% block title %}{{ note.title }} - Smart Påminner Pro{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ url_for('shared_notes') }}">Felles Notater</a></li>
+                <li class="breadcrumb-item active">{{ note.title }}</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Notat redigering -->
+    <div class="col-lg-8 mb-4">
+        <div class="card border-0 shadow-sm h-100">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">{{ note.title }}</h5>
+                <div>
+                    <span class="badge bg-light text-dark" title="Tilgangskode">
+                        <i class="fas fa-key"></i> {{ note.access_code }}
+                    </span>
+                </div>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('update_shared_note', note_id=note.id) }}" id="noteForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <div class="mb-3">
+                        <textarea name="content" id="noteContent" class="form-control" rows="15">{{ note.content }}</textarea>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle"></i> Du kan bruke - for å lage lister
+                        </small>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Lagre
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Medlemmer og chat -->
+    <div class="col-lg-4">
+        <!-- Medlemmer -->
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-users"></i> Medlemmer ({{ note.members|length }})
+                </h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    {% for member in note.members %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <div>
+                            <i class="fas fa-user"></i> {{ member.email }}
+                            {% if member.role == 'owner' %}
+                            <span class="badge bg-primary">Eier</span>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted">
+                            {{ member.joined_at|as_datetime }}
+                        </small>
+                    </li>
+                    {% endfor %}
+                </ul>
+                
+                <hr>
+                <div class="alert alert-info">
+                    <p class="mb-1"><strong>Del dette notatet:</strong></p>
+                    <p class="mb-1">1. Del tilgangskoden: <strong>{{ note.access_code }}</strong></p>
+                    <p class="mb-0">2. Be dem gå til "Bli Med" i Felles Notater</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Chat -->
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-comments"></i> Chat
+                </h5>
+            </div>
+            <div class="card-body p-0">
+                <div id="chatMessages" class="p-3" style="height: 300px; overflow-y: auto;">
+                    {% if note.messages %}
+                        {% for message in note.messages %}
+                        <div class="mb-3 {% if message.sender == current_user.email %}text-end{% endif %}">
+                            <div class="d-inline-block p-2 rounded {% if message.sender == current_user.email %}bg-primary text-white{% else %}bg-light{% endif %}" style="max-width: 80%;">
+                                <div class="mb-1">{{ message.content }}</div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <small class="text-{% if message.sender == current_user.email %}light{% else %}muted{% endif %}">
+                                        {{ message.sender_name if message.sender_name else message.sender }}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center text-muted p-4">
+                            Ingen meldinger ennå. Start samtalen!
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div class="p-3 border-top">
+                    <form method="POST" action="{{ url_for('add_message_to_note', note_id=note.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="input-group">
+                            <input type="text" name="message" class="form-control" placeholder="Skriv en melding...">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Scroll til bunnen av chat ved lasting
+    document.addEventListener('DOMContentLoaded', function() {
+        var chatDiv = document.getElementById('chatMessages');
+        chatDiv.scrollTop = chatDiv.scrollHeight;
+    });
+</script>
+{% endblock %}

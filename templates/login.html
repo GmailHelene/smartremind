@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Logg Inn - Smart Påminner Pro{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">            <div class="card-header">
+                <h3>Logg inn</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.csrf_token }}
+                      <div class="mb-3">
+                        {{ form.username.label(class="form-label") }}
+                        {{ form.username(class="form-control", required=True) }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.password.label(class="form-label") }}
+                        {{ form.password(class="form-control", required=True) }}
+                        <div class="form-text">Har du ikke en konto? <a href="{{ url_for('register') }}">Registrer deg her</a></div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Logg inn</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

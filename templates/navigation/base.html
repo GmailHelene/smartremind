@@ -1,0 +1,12 @@
+<!-- I base.html, i navbar -->
+<div class="navbar-nav ms-auto">
+    <a class="nav-link" href="{{ url_for('dashboard') }}">
+        <i class="fas fa-home"></i> Dashboard
+    </a>
+    <a class="nav-link" href="{{ url_for('shared_notes') }}">
+        <i class="fas fa-sticky-note"></i> Felles Notater
+    </a>
+    <a class="nav-link" href="{{ url_for('logout') }}">
+        <i class="fas fa-sign-out-alt"></i> Logg ut
+    </a>
+</div>

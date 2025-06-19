@@ -1,0 +1,645 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Smart Påminner Pro{% endblock %}
+
+{% block content %}
+    <!-- Gamification Progress (for ADHD users) -->
+    {% if profile and profile.profile_type == 'adhd' %}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="rewards-section card">
+                <div class="card-body">
+                    <h3>🏆 Dine belønninger</h3>
+                    <div class="progress mb-2">
+                        {% set daily_goal = profile.preferences.daily_goal if (profile.preferences and profile.preferences.daily_goal) else 5 %}
+                        {% set completed_today = stats.completed_today if stats else 0 %}
+                        {% set progress_percent = ((completed_today / daily_goal * 100) | round(0, 'floor')) if daily_goal > 0 else 0 %}
+                        <div class="progress-bar bg-success" style="width: {{ (progress_percent|int) if progress_percent is not none else 0 }}%%;"></div>
+                    </div>
+                    <p class="mb-0">{{ completed_today }}/{{ daily_goal }} oppgaver i dag!</p>
+                    {% if stats and stats.points %}
+                        <p class="text-muted">Poeng i dag: {{ stats.points }} 🌟</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Hovedinnhold -->
+    <div class="row">
+        <!-- Ny påminnelse -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-plus-circle"></i> Ny påminnelse
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    {% if form %}
+                    <form method="POST" action="{{ url_for('add_reminder') }}">
+                        {{ form.hidden_tag() }}
+                        
+                        <!-- Tittel -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-heading"></i> Tittel *
+                            </label>
+                            {{ form.title(class="form-control", placeholder="Hva skal huskes?") }}
+                        </div>
+                        
+                        <!-- Beskrivelse -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-align-left"></i> Beskrivelse
+                            </label>
+                            {{ form.description(class="form-control", rows="3", placeholder="Detaljer...") }}
+                        </div>
+                        
+                        <!-- Dato og tid -->
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <label class="form-label">
+                                    <i class="fas fa-calendar"></i> Dato *
+                                </label>
+                                {{ form.date(class="form-control") }}
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">
+                                    <i class="fas fa-clock"></i> Tid *
+                                </label>
+                                {{ form.time(class="form-control") }}
+                            </div>
+                        </div>
+                          <!-- Prioritet og kategori -->
+                        <div class="row mb-3">
+                            <div class="col-6">
+                                <label class="form-label">Prioritet</label>
+                                {{ form.priority(class="form-select") }}
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label">Kategori</label>
+                                {{ form.category(class="form-select") }}
+                            </div>
+                        </div>
+                        
+                        <!-- Del med andre -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="fas fa-share"></i> Del med (e-post, bruk komma for flere)
+                            </label>
+                            {{ form.share_with(class="form-control", placeholder="eksempel@mail.com, annen@mail.com") }}
+                        </div>
+
+                        <!-- Submit knapp -->
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-plus-circle"></i> 
+                                Opprett påminnelse
+                            </button>
+                        </div>
+                    </form>
+                    {% else %}
+                        <p class="text-muted">Skjema ikke tilgjengelig</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Mine påminnelser -->
+        <div class="col-lg-6 mb-4">
+            <div class="card h-100 border-0 shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-list"></i> 
+                        {% if profile and profile.profile_type == 'adhd' %}
+                            Dine neste superoppdrag! 🚀
+                        {% elif profile and profile.profile_type == 'gentle' %}
+                            Noen små ting å huske på 💝
+                        {% else %}
+                            Mine påminnelser
+                        {% endif %}
+                    </h5>
+                </div>
+                
+                <div class="card-body">
+                    {% if my_reminders %}
+                        {% for reminder in my_reminders %}
+                        <div class="alert alert-light border-start border-{{ 'danger' if reminder.priority == 'Høy' else 'warning' if reminder.priority == 'Medium' else 'info' }} border-3 {{ profile.profile_type if profile else '' }}-card">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">{{ reminder.title }}</h6>
+                                    <p class="mb-1 text-muted small">{{ reminder.description }}</p>
+                                    <small class="text-muted">
+                                        <i class="fas fa-clock"></i> {{ reminder.datetime }}
+                                        <span class="badge bg-{{ 'danger' if reminder.priority == 'Høy' else 'warning' if reminder.priority == 'Medium' else 'info' }}">
+                                            {{ reminder.priority }}
+                                        </span>
+                                    </small>
+                                </div>
+                                <div class="btn-group btn-group-sm">
+                                    <button onclick="completeReminder('{{ reminder.id }}')" 
+                                           class="btn btn-success btn-sm" title="Fullfør">
+                                        {% if profile and profile.profile_type == 'adhd' %}
+                                            🎉
+                                        {% elif profile and profile.profile_type == 'gentle' %}
+                                            ✨
+                                        {% else %}
+                                            <i class="fas fa-check"></i>
+                                        {% endif %}
+                                    </button>
+                                    <a href="{{ url_for('delete_reminder', reminder_id=reminder.id) }}" 
+                                       class="btn btn-danger btn-sm" title="Slett"
+                                       onclick="return confirm('Er du sikker?')">
+                                        <i class="fas fa-trash"></i>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center py-3">
+                            {% if profile and profile.profile_type == 'gentle' %}
+                                🌸 Alt er rolig akkurat nå. Ingen påminnelser.
+                            {% else %}
+                                Ingen påminnelser ennå.
+                            {% endif %}
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notater preview -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-sticky-note"></i> Siste notater
+                    </h5>
+                    <a href="{{ url_for('notes') }}" class="btn btn-sm btn-light">
+                        <i class="fas fa-external-link-alt"></i> Se alle notater
+                    </a>
+                </div>
+                <div class="card-body">
+                    {% if my_notes or shared_notes %}
+                        <div class="row">
+                            {% if my_notes %}
+                                <div class="col-md-6">
+                                    <h6 class="mb-3">Mine notater</h6>
+                                    {% for note in my_notes %}
+                                        <div class="card mb-2">
+                                            <div class="card-body py-2 px-3">
+                                                <h6 class="card-title mb-1">{{ note.title }}</h6>
+                                                <p class="card-text small text-truncate">{{ note.content }}</p>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            {% if shared_notes %}
+                                <div class="col-md-6">
+                                    <h6 class="mb-3">Delt med meg</h6>
+                                    {% for note in shared_notes %}
+                                        <div class="card mb-2">
+                                            <div class="card-body py-2 px-3">
+                                                <h6 class="card-title mb-1">{{ note.title }}</h6>
+                                                <p class="card-text small text-truncate">{{ note.content }}</p>
+                                                <small class="text-muted">Fra: {{ note.user_id }}</small>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% else %}
+                        <p class="text-center py-3">
+                            <i class="fas fa-info-circle"></i> 
+                            Du har ingen notater ennå. <a href="{{ url_for('notes') }}">Opprett ditt første notat</a>
+                        </p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delte påminnelser -->
+    {% if shared_reminders %}
+    <div class="row">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">
+                        <i class="fas fa-share-alt"></i> Delt med meg
+                    </h5>
+                </div>
+                <div class="card-body">
+                    {% for reminder in shared_reminders %}
+                    <div class="alert alert-info">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ reminder.title }}</h6>
+                                <p class="mb-1">{{ reminder.description }}</p>
+                                <small class="text-muted">
+                                    Delt av: {{ reminder.shared_by }} | 
+                                    <i class="fas fa-clock"></i> {{ reminder.datetime }}
+                                </small>
+                            </div>
+                            <button onclick="completeReminder('{{ reminder.id }}')" 
+                                   class="btn btn-success btn-sm">
+                                <i class="fas fa-check"></i> Fullfør
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Tabs and Modals (JS-driven) -->
+    <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="reminders-tab" data-bs-toggle="tab" data-bs-target="#reminders" type="button" role="tab">Reminders</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="noteboard-tab" data-bs-toggle="tab" data-bs-target="#noteboard" type="button" role="tab">Noteboard</button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="myTabContent">
+        <!-- Reminders Tab -->
+        <div class="tab-pane fade show active" id="reminders" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>Your Reminders</h2>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addReminderModal">
+                    <i class="bi bi-plus"></i> Add Reminder
+                </button>
+            </div>
+            
+            <div class="row">
+                <div class="col-md-12">
+                    <div id="reminders-list" class="list-group mb-4">
+                        <!-- Reminders will be loaded here -->
+                        <div class="text-center py-5" id="reminders-loading">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                        <div class="text-center py-5 d-none" id="no-reminders">
+                            <p class="lead">No reminders found. Add your first reminder!</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-12">
+                    <h3>Reminders Shared With You</h3>
+                    <div id="shared-reminders-list" class="list-group">
+                        <!-- Shared reminders will be loaded here -->
+                        <div class="text-center py-5 d-none" id="no-shared-reminders">
+                            <p class="lead">No shared reminders found.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Noteboard Tab -->
+        <div class="tab-pane fade" id="noteboard" role="tabpanel">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>Shared Noteboard</h2>
+                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNoteModal">
+                    <i class="bi bi-plus"></i> Add Note
+                </button>
+            </div>
+            
+            <div id="notes-list" class="row">
+                <!-- Notes will be loaded here -->
+                <div class="text-center py-5" id="notes-loading">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                <div class="text-center py-5 d-none" id="no-notes">
+                    <p class="lead">No notes found. Add your first note to the shared board!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Reminder Modal -->
+    <div class="modal fade" id="addReminderModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Reminder</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-reminder-form">
+                        <div class="mb-3">
+                            <label for="reminder-title" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="reminder-title" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="reminder-description" class="form-label">Description</label>
+                            <textarea class="form-control" id="reminder-description" rows="3"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="reminder-date" class="form-label">Date</label>
+                            <input type="datetime-local" class="form-control" id="reminder-date" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="reminder-share" class="form-label">Share with (comma separated emails)</label>
+                            <input type="text" class="form-control" id="reminder-share">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-reminder">Save Reminder</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Note Modal -->
+    <div class="modal fade" id="addNoteModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Add New Note</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="add-note-form">
+                        <div class="mb-3">
+                            <label for="note-title" class="form-label">Title</label>
+                            <input type="text" class="form-control" id="note-title" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="note-content" class="form-label">Content</label>
+                            <textarea class="form-control" id="note-content" rows="5" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="note-share" class="form-label">Share with (comma separated emails)</label>
+                            <input type="text" class="form-control" id="note-share">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save-note">Save Note</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block styles %}
+<style>
+/* Profilspesifikke stiler */
+.dashboard-container[data-profile="adhd"] {
+    --primary-color: #FF6B6B;
+    --secondary-color: #4ECDC4;
+    --success-color: #45B7D1;
+}
+
+.dashboard-container[data-profile="gentle"] {
+    --primary-color: #F8BBD9;
+    --secondary-color: #E4C1F9;
+    --success-color: #A8E6CF;
+}
+
+.dashboard-container[data-profile="student"] {
+    --primary-color: #2E86AB;
+    --secondary-color: #A23B72;
+    --success-color: #F18F01;
+}
+
+.dashboard-container[data-profile="senior"] {
+    --primary-color: #2E86AB;
+    font-size: 1.2rem;
+}
+
+.adhd-card {
+    border-left: 4px solid #FF6B6B !important;
+    animation: gentle-pulse 2s infinite;
+}
+
+.gentle-card {
+    background: linear-gradient(135deg, #fff 0%, #f8f9ff 100%);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.senior-card .reminder-header h3 {
+    font-size: 1.4rem;
+    font-weight: bold;
+}
+
+.focus-widget {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.timer-display {
+    font-size: 2.5rem;
+    font-weight: bold;
+    margin: 1rem 0;
+    font-family: 'Courier New', monospace;
+}
+
+@keyframes gentle-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.95; }
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    border-left: 4px solid #2E86AB;
+}
+
+.stat-icon {
+    font-size: 2rem;
+    color: #2E86AB;
+    margin-bottom: 0.5rem;
+}
+
+.stat-content h3 {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #2E86AB;
+    margin: 0;
+}
+
+.stat-content p {
+    color: #666;
+    margin: 0;
+}
+
+.quick-actions {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+    .quick-actions {
+        justify-content: center;
+    }
+    
+    .stat-card {
+        padding: 1rem;
+    }
+    
+    .timer-display {
+        font-size: 2rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let focusTimer;
+let currentSession = null;
+
+function startFocusSession(minutes) {
+    if (currentSession) {
+        clearInterval(focusTimer);
+    }
+    
+    fetch('/focus-session/start', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `duration=${minutes}&session_type=pomodoro`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.session_id) {
+            currentSession = data.session_id;
+            startTimer(minutes * 60);
+        }
+    });
+}
+
+function startFocusMode() {
+    // Implementer focus-funksjonalitet
+    console.log('Focus mode activated');
+}
+function startTimer(seconds) {
+    const timerDisplay = document.getElementById('focusTimer');
+    if (!timerDisplay) return;
+    
+    let timeLeft = seconds;
+    
+    focusTimer = setInterval(() => {
+        const minutes = Math.floor(timeLeft / 60);
+        const secs = timeLeft % 60;
+        timerDisplay.textContent = `${minutes}:${secs.toString().padStart(2, '0')}`;
+        
+        if (timeLeft <= 0) {
+            clearInterval(focusTimer);
+            completeFocusSession();
+        }
+        timeLeft--;
+    }, 1000);
+}
+
+function completeFocusSession() {
+    const profile = '{{ profile.profile_type if profile else "standard" }}';
+    let message = 'Fokusøkt fullført!';
+    
+    if (profile === 'adhd') {
+        message = '🎉 Fantastisk! Du klarte hele fokusøkten! Du er en stjerne! ⭐';
+    } else if (profile === 'gentle') {
+        message = '✨ Vakkert gjort. Du har tatt deg tid til å fokusere. 🌸';
+    }
+    
+    alert(message);
+    
+    if (currentSession) {
+        fetch(`/focus-session/complete/${currentSession}`, {
+            method: 'POST'
+        }).catch(error => console.error('Error completing session:', error));
+    }
+    
+    // Reset timer display
+    document.getElementById('focusTimer').textContent = '25:00';
+    currentSession = null;
+}
+
+function quickTask() {
+    const task = prompt('🚀 Skriv en rask oppgave (maks 15 min):');
+    if (task && task.trim()) {
+        alert('Rask oppgave lagt til!');
+        // Her kan du implementere faktisk oppgavelagring
+    }
+}
+
+function completeReminder(reminderId) {
+    if (!reminderId || !confirm('Marker som fullført?')) return;
+    
+    fetch(`/complete-reminder/${reminderId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        }
+    })
+    .then(response => {
+        if (response.ok) {
+            const profile = '{{ profile.profile_type if profile else "standard" }}';
+            let message = 'Påminnelse fullført!';
+            
+            if (profile === 'adhd') {
+                const celebrations = ['🎉', '🌟', '🚀', '✨', '🎊'];
+                const randomCelebration = celebrations[Math.floor(Math.random() * celebrations.length)];
+                message = `${randomCelebration} Supert! Du er på fyr og flamme i dag!`;
+            } else if (profile === 'gentle') {
+                message = '💝 Nydelig gjort. Du tar så godt vare på deg selv.';
+            }
+            
+            alert(message);
+            location.reload();
+        } else {
+            throw new Error('Server error');
+        }
+    })
+    .catch(error => {
+        console.error('Error completing reminder:', error);
+        alert('Feil ved fullføring av påminnelse. Prøv igjen.');
+    });
+}
+
+function startBreak(minutes) {
+    alert(`Pause startet for ${minutes} minutter! 😊`);
+    // Implementer pause-timer hvis ønskelig
+}
+
+function gentleReminder() {
+    const reminder = prompt('🌸 Hva vil du minde deg selv på?');
+    if (reminder && reminder.trim()) {
+        alert('Mild påminnelse lagt til ✨');
+        // Her kan du implementere faktisk påminnelselagring
+    }
+}
+
+// Sett initial timer display
+document.addEventListener('DOMContentLoaded', function() {
+    const timerDisplay = document.getElementById('focusTimer');
+    if (timerDisplay && !timerDisplay.textContent.includes(':')) {
+        timerDisplay.textContent = '25:00';
+    }
+});
+</script>
+{% endblock %}

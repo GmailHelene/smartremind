@@ -1,0 +1,11 @@
+flask==2.2.3
+flask-login==0.6.2
+flask-wtf==1.1.1
+werkzeug==2.3.0
+email-validator==2.0.0
+apscheduler==3.10.1
+flask-mail==0.9.1
+psutil==5.9.5
+wtforms==3.0.1
+python-dotenv==1.0.0
+gunicorn==20.1.0

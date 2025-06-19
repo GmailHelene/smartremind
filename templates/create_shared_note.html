@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Nytt Felles Notat - Smart Påminner Pro{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 offset-lg-2">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-plus-circle"></i> Opprett Nytt Felles Notat
+                </h5>
+            </div>
+            <div class="card-body">                <form method="POST" action="{{ url_for('create_shared_note') }}">
+                    {{ form.csrf_token }}
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-heading"></i> Tittel *
+                        </label>
+                        <input type="text" name="title" class="form-control" required 
+                               placeholder="Gi notatet en beskrivende tittel...">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">
+                            <i class="fas fa-align-left"></i> Innhold
+                        </label>
+                        <textarea name="content" class="form-control" rows="10" 
+                                  placeholder="Start å skrive her..."></textarea>
+                        <small class="form-text text-muted">
+                            Tips: Du kan bruke - for å lage lister.
+                        </small>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <p class="mb-0">
+                            <i class="fas fa-info-circle"></i> 
+                            Når du oppretter et notat, vil du få en tilgangskode som du kan dele med andre.
+                            Dette lar dem bli med i notatet og redigere innholdet sammen med deg.
+                        </p>
+                    </div>
+                    
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-save"></i> Opprett Notat
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

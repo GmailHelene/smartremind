@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Offline - Smart Påminner Pro{% endblock %}
+
+{% block content %}
+<div class="text-center mt-5">
+    <i class="fas fa-wifi-slash fa-5x text-muted mb-4"></i>
+    <h1 class="display-4">Du er offline</h1>
+    <p class="lead">Smart Påminner Pro trenger internettforbindelse for å fungere optimalt.</p>
+    <p>Noen funksjoner vil være begrenset i offline-modus.</p>
+    
+    <div class="mt-4">
+        <a href="{{ url_for('index') }}" class="btn btn-primary">
+            <i class="fas fa-sync"></i> Prøv på nytt
+        </a>
+    </div>
+</div>
+{% endblock %}

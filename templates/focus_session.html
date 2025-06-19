@@ -1,0 +1,398 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style>
+.focus-timer {
+    text-align: center;
+    padding: 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 20px;
+    margin: 2rem 0;
+}
+
+.timer-display {
+    font-size: 4rem;
+    font-weight: bold;
+    margin: 1rem 0;
+    font-family: 'Courier New', monospace;
+}
+
+.session-controls {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin: 2rem 0;
+}
+
+.session-btn {
+    padding: 1rem 2rem;
+    border: none;
+    border-radius: 50px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-start { background: #4CAF50; color: white; }
+.btn-pause { background: #ff9800; color: white; }
+.btn-stop { background: #f44336; color: white; }
+
+.session-types {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 2rem 0;
+}
+
+.session-type-card {
+    padding: 1.5rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.session-type-card:hover {
+    border-color: #2E86AB;
+    transform: translateY(-2px);
+}
+
+.session-type-card.active {
+    border-color: #2E86AB;
+    background: #f0f8ff;
+}
+
+.progress-ring {
+    width: 200px;
+    height: 200px;
+    margin: 0 auto;
+}
+
+.progress-ring-circle {
+    stroke: #fff;
+    stroke-width: 4;
+    fill: transparent;
+    r: 90;
+    cx: 100;
+    cy: 100;
+    stroke-dasharray: 565.48;
+    stroke-dashoffset: 565.48;
+    transition: stroke-dashoffset 1s ease;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>🎯 Fokusøkt</h1>
+    
+    <!-- Session Type Selection -->
+    <div class="session-types">
+        <div class="session-type-card active" data-type="pomodoro" data-duration="25">
+            <h3>🍅 Pomodoro</h3>
+            <p>25 min fokus + 5 min pause</p>
+        </div>
+        <div class="session-type-card" data-type="deep-work" data-duration="50">
+            <h3>🔥 Deep Work</h3>
+            <p>50 min intens fokus</p>
+        </div>
+        <div class="session-type-card" data-type="gentle" data-duration="15">
+            <h3>🌸 Gentle Focus</h3>
+            <p>15 min lett fokus</p>
+        </div>
+        <div class="session-type-card" data-type="study" data-duration="45">
+            <h3>📚 Studieøkt</h3>
+            <p>45 min studering</p>
+        </div>
+    </div>
+
+    <!-- Timer Display -->
+    <div class="focus-timer">
+        <div class="progress-ring">
+            <svg width="200" height="200">
+                <circle class="progress-ring-circle" id="progress-circle"></circle>
+            </svg>
+        </div>
+        <div class="timer-display" id="timer-display">25:00</div>
+        <div class="session-status" id="session-status">Klar til å starte</div>
+    </div>
+
+    <!-- Controls -->
+    <div class="session-controls">
+        <button class="session-btn btn-start" id="start-btn">▶️ Start</button>
+        <button class="session-btn btn-pause" id="pause-btn" disabled>⏸️ Pause</button>
+        <button class="session-btn btn-stop" id="stop-btn" disabled>⏹️ Stopp</button>
+    </div>
+
+    <!-- Session Notes -->
+    <div class="session-notes" style="margin-top: 2rem;">
+        <h3>📝 Notater</h3>
+        <textarea id="session-notes" placeholder="Hva skal du fokusere på i denne økten?" 
+                  style="width: 100%; height: 100px; padding: 1rem; border-radius: 10px; border: 1px solid #ddd;"></textarea>
+    </div>
+
+    <!-- Statistics -->
+    <div class="focus-stats">
+        <h3>📊 Dagens statistikk</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem;">
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.sessions_today or 0 }}</div>
+                <div class="stat-label">Økter i dag</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.total_time_today or 0 }}</div>
+                <div class="stat-label">Minutter fokus</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">{{ stats.streak_days or 0 }}</div>
+                <div class="stat-label">Dager på rad</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+class FocusTimer {
+    constructor() {
+        this.duration = 25 * 60; // 25 minutes in seconds
+        this.timeLeft = this.duration;
+        this.isRunning = false;
+        this.isPaused = false;
+        this.sessionId = null;
+        this.sessionType = 'pomodoro';
+        this.interval = null;
+        
+        this.initializeElements();
+        this.bindEvents();
+    }
+    
+    initializeElements() {
+        this.timerDisplay = document.getElementById('timer-display');
+        this.statusDisplay = document.getElementById('session-status');
+        this.startBtn = document.getElementById('start-btn');
+        this.pauseBtn = document.getElementById('pause-btn');
+        this.stopBtn = document.getElementById('stop-btn');
+        this.progressCircle = document.getElementById('progress-circle');
+        this.sessionNotes = document.getElementById('session-notes');
+    }
+    
+    bindEvents() {
+        this.startBtn.addEventListener('click', () => this.startSession());
+        this.pauseBtn.addEventListener('click', () => this.pauseSession());
+        this.stopBtn.addEventListener('click', () => this.stopSession());
+        
+        // Session type selection
+        document.querySelectorAll('.session-type-card').forEach(card => {
+            card.addEventListener('click', () => this.selectSessionType(card));
+        });
+    }
+    
+    selectSessionType(card) {
+        // Remove active class from all cards
+        document.querySelectorAll('.session-type-card').forEach(c => c.classList.remove('active'));
+        card.classList.add('active');
+        
+        this.sessionType = card.dataset.type;
+        this.duration = parseInt(card.dataset.duration) * 60;
+        this.timeLeft = this.duration;
+        this.updateDisplay();
+    }
+    
+    async startSession() {
+        if (!this.isRunning) {
+            // Start new session
+            const response = await fetch('/focus-session/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `session_type=${this.sessionType}&duration=${this.duration / 60}&notes=${this.sessionNotes.value}`
+            });
+            
+            const data = await response.json();
+            this.sessionId = data.session_id;
+        }
+        
+        this.isRunning = true;
+        this.isPaused = false;
+        this.startBtn.disabled = true;
+        this.pauseBtn.disabled = false;
+        this.stopBtn.disabled = false;
+        this.statusDisplay.textContent = 'Fokuserer...';
+        
+        this.interval = setInterval(() => {
+            this.timeLeft--;
+            this.updateDisplay();
+            
+            if (this.timeLeft <= 0) {
+                this.completeSession();
+            }
+        }, 1000);
+    }
+    
+    pauseSession() {
+        if (this.isRunning && !this.isPaused) {
+            clearInterval(this.interval);
+            this.isPaused = true;
+            this.startBtn.disabled = false;
+            this.statusDisplay.textContent = 'Pauset';
+        }
+    }
+    
+    async stopSession() {
+        clearInterval(this.interval);
+        this.isRunning = false;
+        this.isPaused = false;
+        this.startBtn.disabled = false;
+        this.pauseBtn.disabled = true;
+        this.stopBtn.disabled = true;
+        this.statusDisplay.textContent = 'Avbrutt';
+        
+        if (this.sessionId) {
+            await fetch(`/focus-session/stop/${this.sessionId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `notes=${this.sessionNotes.value}`
+            });
+        }
+        
+        this.resetTimer();
+    }
+    
+    async completeSession() {
+        clearInterval(this.interval);
+        this.isRunning = false;
+        this.startBtn.disabled = false;
+        this.pauseBtn.disabled = true;
+        this.stopBtn.disabled = true;
+        this.statusDisplay.textContent = '🎉 Økten fullført!';
+        
+        // Play completion sound
+        this.playCompletionSound();
+        
+        // Show completion notification
+        if (Notification.permission === 'granted') {
+            new Notification('Fokusøkt fullført!', {
+                body: 'Godt jobbet! Ta en velfortjent pause.',
+                icon: '/images/icon-96x96.png'
+            });
+        }
+        
+        if (this.sessionId) {
+            await fetch(`/focus-session/complete/${this.sessionId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `notes=${this.sessionNotes.value}`
+            });
+        }
+        
+        // Show celebration animation
+        this.showCelebration();
+        
+        setTimeout(() => {
+            this.resetTimer();
+        }, 3000);
+    }
+    
+    updateDisplay() {
+        const minutes = Math.floor(this.timeLeft / 60);
+        const seconds = this.timeLeft % 60;
+        this.timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        
+        // Update progress circle
+        const progress = (this.duration - this.timeLeft) / this.duration;
+        const circumference = 2 * Math.PI * 90;
+        const offset = circumference - (progress * circumference);
+        this.progressCircle.style.strokeDashoffset = offset;
+    }
+    
+    resetTimer() {
+        this.timeLeft = this.duration;
+        this.updateDisplay();
+        this.progressCircle.style.strokeDashoffset = 565.48;
+    }
+    
+    playCompletionSound() {
+        // Create audio context for completion sound
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
+        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
+        oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
+        
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+        
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.3);
+    }
+    
+    showCelebration() {
+        // Add celebration animation
+        const celebration = document.createElement('div');
+        celebration.innerHTML = '🎉✨🎊';
+        celebration.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 3rem;
+            z-index: 1000;
+            animation: celebration 2s ease-out;
+        `;
+        
+        document.body.appendChild(celebration);
+        
+        setTimeout(() => {
+            celebration.remove();
+        }, 2000);
+    }
+}
+
+// Initialize timer when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    new FocusTimer();
+});
+
+// Add CSS for celebration animation
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes celebration {
+        0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+        50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+        100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+    }
+    
+    .stat-card {
+        background: white;
+        padding: 1rem;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    
+    .stat-number {
+        font-size: 2rem;
+        font-weight: bold;
+        color: #2E86AB;
+    }
+    
+    .stat-label {
+        color: #666;
+        font-size: 0.9rem;
+    }
+`;
+document.head.appendChild(style);
+</script>
+{% endblock %}

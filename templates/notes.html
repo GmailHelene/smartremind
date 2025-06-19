@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Notater - Smart Påminner Pro{% endblock %}
+
+{% block content %}
+<!-- Tilbakeknapp -->
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Tilbake til dashboard
+        </a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-sticky-note"></i> Nytt notat</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('add_note') }}">
+                    {{ form.csrf_token }}
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Tittel</label>
+                        {{ form.title(class="form-control") }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Innhold</label>
+                        {{ form.content(class="form-control", rows=5) }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Del med (kommaseparerte e-poster)</label>
+                        {{ form.share_with(class="form-control", placeholder="eks: bruker1@mail.com, bruker2@mail.com") }}
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Lagre notat</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-6 mb-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fas fa-book"></i> Mine notater</h5>
+            </div>
+            <div class="card-body">
+                {% if my_notes %}
+                    {% for note in my_notes %}
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ note.title }}</h5>
+                                <p class="card-text">{{ note.content }}</p>
+                                <p class="card-text"><small class="text-muted">Opprettet: {{ note.created }}</small></p>
+                                {% if note.shared_with %}
+                                    <p class="card-text"><small class="text-muted">Delt med {{ note.shared_with|length }} personer</small></p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">Ingen notater ennå.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-6 mb-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-share-alt"></i> Delt med meg</h5>
+            </div>
+            <div class="card-body">
+                {% if shared_notes %}
+                    {% for note in shared_notes %}
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ note.title }}</h5>
+                                <p class="card-text">{{ note.content }}</p>
+                                <p class="card-text"><small class="text-muted">Delt av: {{ note.user_id }}</small></p>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted">Ingen delte notater ennå.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

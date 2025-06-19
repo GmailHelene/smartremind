@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Velkommen - Smart Påminner Pro{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header text-center">
+                <h1>Velkommen til Smart Påminner Pro</h1>
+            </div>
+            <div class="card-body">
+                <p class="lead text-center">Din personlige påminnelses- og notatsdelingsapp</p>
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Logg inn / Registrer deg</a>
+                </div>
+                <!-- Added CSRF token for form protection -->
+                {% if form %}
+                <form id="csrf-form" style="display:none">
+                    {{ form.csrf_token }}
+                </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

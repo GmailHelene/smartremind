@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Velg din profil{% endblock %}
+
+{% block content %}
+<div class="profile-setup-container">
+    <h1>Velkommen! La oss tilpasse appen for deg</h1>
+    <p>Velg profilen som passer best til dine behov:</p>
+    
+    <form method="POST" class="profile-form">
+        <div class="profile-options">
+            <div class="profile-card" data-profile="adhd">
+                <div class="profile-icon">🧠</div>
+                <h3>ADHD-vennlig</h3>
+                <p>Gentle påminnelser, fokusmodus og belønningssystem</p>
+                <ul>
+                    <li>Hyppige, snille påminnelser</li>
+                    <li>Innebygd pomodoro-timer</li>
+                    <li>Hyperfokus-beskyttelse</li>
+                    <li>Dopamin-belønninger</li>
+                </ul>
+                <input type="radio" name="profile_type" value="adhd" id="adhd">
+                <label for="adhd">Velg ADHD-modus</label>
+            </div>
+            
+            <div class="profile-card" data-profile="student">
+                <div class="profile-icon">🎓</div>
+                <h3>Student</h3>
+                <p>Optimalisert for studier, oppgaver og eksamener</p>
+                <ul>
+                    <li>Oppgave- og eksamenssporing</li>
+                    <li>Studietimer og mål</li>
+                    <li>Prosjektorganisering</li>
+                    <li>Prestasjonssporing</li>
+                </ul>
+                <input type="radio" name="profile_type" value="student" id="student">
+                <label for="student">Velg Student-modus</label>
+            </div>
+            
+            <div class="profile-card" data-profile="gentle">
+                <div class="profile-icon">🌸</div>
+                <h3>Gentle Mode</h3>
+                <p>Milde, oppmuntrende påminnelser uten stress</p>
+                <ul>
+                    <li>Rolige farger og lyder</li>
+                    <li>Positive forsterkninger</li>
+                    <li>Mindfulness-integration</li>
+                    <li>Minimal distraksjoner</li>
+                </ul>
+                <input type="radio" name="profile_type" value="gentle" id="gentle">
+                <label for="gentle">Velg Gentle-modus</label>
+            </div>
+            
+            <div class="profile-card" data-profile="senior">
+                <div class="profile-icon">👴</div>
+                <h3>Senior-vennlig</h3>
+                <p>Stor tekst, enkel navigasjon og medisinskremmer</p>
+                <ul>
+                    <li>Store knapper og tekst</li>
+                    <li>Enkel, ren grensesnitt</li>
+                    <li>Medisinskremmer</li>
+                    <li>Nødkontakter</li>
+                </ul>
+                <input type="radio" name="profile_type" value="senior" id="senior">
+                <label for="senior">Velg Senior-modus</label>
+            </div>
+            
+            <div class="profile-card" data-profile="standard">
+                <div class="profile-icon">⚡</div>
+                <h3>Standard</h3>
+                <p>Klassisk påminnelsesapp med alle funksjoner</p>
+                <ul>
+                    <li>Alle standardfunksjoner</li>
+                    <li>Fleksibel tilpasning</li>
+                    <li>Avanserte innstillinger</li>
+                    <li>Full kontroll</li>
+                </ul>
+                <input type="radio" name="profile_type" value="standard" id="standard">
+                <label for="standard">Velg Standard-modus</label>
+            </div>
+        </div>
+        
+        <div class="accessibility-section">
+            <h3>Tilgjengelighetsbehov (valgfritt)</h3>
+            <div class="accessibility-options">
+                <label><input type="checkbox" name="accessibility" value="large_text"> Stor tekst</label>
+                <label><input type="checkbox" name="accessibility" value="high_contrast"> Høy kontrast</label>
+                <label><input type="checkbox" name="accessibility" value="reduced_motion"> Redusert bevegelse</label>
+                <label><input type="checkbox" name="accessibility" value="voice_enabled"> Stemmestøtte</label>
+                <label><input type="checkbox" name="accessibility" value="color_blind_friendly"> Fargeblindvennlig</label>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn-primary">Fortsett til appen</button>
+    </form>
+</div>
+
+<style>
+.profile-setup-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.profile-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1.5rem;
+    margin: 2rem 0;
+}
+
+.profile-card {
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.profile-card:hover,
+.profile-card.selected {
+    border-color: #2E86AB;
+    box-shadow: 0 4px 12px rgba(46, 134, 171, 0.2);
+    transform: translateY(-2px);
+}
+
+.profile-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.profile-card h3 {
+    color: #2E86AB;
+    margin-bottom: 0.5rem;
+}
+
+.profile-card ul {
+    text-align: left;
+    margin: 1rem 0;
+    padding-left: 1rem;
+}
+
+.profile-card li {
+    margin: 0.5rem 0;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.accessibility-section {
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+}
+
+.accessibility-options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.btn-primary {
+    background: #2E86AB;
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    margin-top: 1rem;
+}
+</style>
+
+<script>
+document.querySelectorAll('.profile-card').forEach(card => {
+    card.addEventListener('click', function() {
+        document.querySelectorAll('.profile-card').forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+        this.querySelector('input[type="radio"]').checked = true;
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block title %}Bli Med i Notat - Smart Påminner Pro{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-6 offset-lg-3">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-link"></i> Bli Med i Felles Notat
+                </h5>
+            </div>
+            <div class="card-body">                <form method="POST" action="{{ url_for('join_shared_note') }}">
+                    {{ form.csrf_token }}
+                    
+                    <div class="mb-4">
+                        <label class="form-label">
+                            <i class="fas fa-key"></i> Tilgangskode *
+                        </label>
+                        <input type="text" name="access_code" class="form-control form-control-lg" required 
+                               placeholder="Skriv inn tilgangskode..." maxlength="6">
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <p class="mb-0">
+                            <i class="fas fa-info-circle"></i> 
+                            Skriv inn tilgangskoden du har fått fra eieren av notatet.
+                            Tilgangskoden er vanligvis 6 tegn (bokstaver og tall).
+                        </p>
+                    </div>
+                    
+                    <div class="d-grid mt-4">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-sign-in-alt"></i> Bli Med
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
