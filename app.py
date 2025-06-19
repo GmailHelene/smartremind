@@ -19,6 +19,7 @@ from flask_mail import Message, Mail
 from flask_wtf.csrf import CSRFProtect
 from apscheduler.schedulers.background import BackgroundScheduler
 import psutil  # For memory usage tracking
+import re  # For email validation
 
 # Set up logger
 logger = logging.getLogger(__name__)
@@ -348,10 +349,9 @@ def send_email(to, subject, template=None, html_content=None, **kwargs):
         else:
             logger.error("Email missing both template and HTML content")
             return False
-            
-        # For this example, just log instead of actually sending
-        # mail.send(msg)
-        logger.info(f"Email would be sent to {to}: {subject}")
+              # Send the email
+        mail.send(msg)
+        logger.info(f"Email sent to {to}: {subject}")
         return True
         
     except Exception as e:
@@ -359,56 +359,65 @@ def send_email(to, subject, template=None, html_content=None, **kwargs):
         return False
 
 def check_reminders_for_notifications():
-    """Check reminders and send notifications"""
+    """Check reminders and send notifications with memory logging"""
     with app.app_context():
         try:
+            # Log memory usage
+            process = psutil.Process()
+            memory_mb = process.memory_info().rss / 1024 / 1024
+            logger.info(f"Memory usage before reminder check: {memory_mb:.2f} MB")
+            
             now = datetime.now()
             notification_time = now + timedelta(minutes=app.config['NOTIFICATION_ADVANCE_MINUTES'])
             
-            # Hent påminnelser
             reminders = dm.load_data('reminders')
             shared_reminders = dm.load_data('shared_reminders')
             notifications = dm.load_data('notifications')
             
-            # Allerede sendte påminnelser
             sent_notifications = {n['reminder_id'] for n in notifications}
             all_reminders = []
             
-            # Behandle vanlige påminnelser
+            # Process reminders
             for reminder in reminders:
-                if not reminder.get('completed') and reminder['id'] not in sent_notifications:
+                if not reminder['completed'] and reminder['id'] not in sent_notifications:
                     try:
                         reminder_dt = datetime.fromisoformat(reminder['datetime'].replace(' ', 'T'))
                         if now <= reminder_dt <= notification_time:
-                            if reminder.get('user_id') and '@' in reminder['user_id']:
+                            if reminder['user_id'] and '@' in reminder['user_id']:
                                 all_reminders.append((reminder, reminder['user_id']))
-                            logger.info(f"Planlagt påminnelse for {reminder['title']}")
                     except (ValueError, KeyError) as e:
-                        logger.warning(f"Ugyldig påminnelse-datetime: {e}")
+                        logger.warning(f"Invalid reminder datetime: {e}")
             
-            # Behandle delte påminnelser
+            # Process shared reminders
             for reminder in shared_reminders:
-                if not reminder.get('completed') and reminder['id'] not in sent_notifications:
+                if not reminder['completed'] and reminder['id'] not in sent_notifications:
                     try:
                         reminder_dt = datetime.fromisoformat(reminder['datetime'].replace(' ', 'T'))
                         if now <= reminder_dt <= notification_time:
-                            if reminder.get('shared_with') and '@' in reminder['shared_with']:
+                            if reminder['shared_with'] and '@' in reminder['shared_with']:
                                 all_reminders.append((reminder, reminder['shared_with']))
-                            logger.info(f"Planlagt delt påminnelse for {reminder['title']}")
                     except (ValueError, KeyError) as e:
-                        logger.warning(f"Ugyldig delt påminnelse-datetime: {e}")
+                        logger.warning(f"Invalid shared reminder datetime: {e}")
             
-            # Send påminnelser (maks 5 per kjøring for å unngå minneproblemer)
+            # Send notifications (limit to 5 per run to prevent memory issues)
             sent_count = 0
             for reminder, recipient_email in all_reminders[:5]:
                 subject = f"🔔 Påminnelse: {reminder['title']}"
+                html_content = f"""
+                <h2>Påminnelse: {reminder['title']}</h2>
+                <p>Dette er en påminnelse om at du har en oppgave som snart forfaller.</p>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
+                    <h3>{reminder['title']}</h3>
+                    <p><strong>Beskrivelse:</strong> {reminder.get('description', 'Ingen beskrivelse')}</p>
+                    <p><strong>Tid:</strong> {reminder['datetime']}</p>
+                    <p><strong>Prioritet:</strong> {reminder['priority']}</p>
+                </div>
+                """
                 
-                # Bruk felles e-postmal for påminnelser
                 success = send_email(
                     to=recipient_email,
                     subject=subject,
-                    template='emails/reminder_notification.html',
-                    reminder=reminder
+                    html_content=html_content
                 )
                 
                 if success:
@@ -419,26 +428,26 @@ def check_reminders_for_notifications():
                         'type': 'reminder_notification'
                     })
                     sent_count += 1
-                    logger.info(f"Sendt påminnelse for {reminder['title']} til {recipient_email}")
-                else:
-                    logger.error(f"Kunne ikke sende påminnelse for {reminder['title']} til {recipient_email}")
             
-            # Lagre oppdaterte påminnelser
+            # Save updated notifications
             if sent_count > 0:
                 dm.save_data('notifications', notifications)
-                logger.info(f"Sendt {sent_count} påminnelser")
-        
-        except Exception as e:
-            logger.error(f"Feil ved sjekk av påminnelser: {e}")
+                logger.info(f"Sent {sent_count} reminder notifications")
             
-# Initialiser scheduler med redusert frekvens
+            # Log memory usage after
+            memory_mb_after = process.memory_info().rss / 1024 / 1024
+            logger.info(f"Memory usage after reminder check: {memory_mb_after:.2f} MB")
+            
+        except Exception as e:
+            logger.error(f"Error checking reminders: {e}")
+
+# Initialize scheduler with reduced frequency
 scheduler = BackgroundScheduler()
 scheduler.add_job(
     func=check_reminders_for_notifications,
     trigger="interval",
-    minutes=15,  # Redusert fra 5 til 15 minutter for å spare ressurser
-    id='check_reminders_for_notifications',
-    next_run_time=datetime.now()  # Start første sjekk umiddelbart
+    minutes=15,  # Reduced from 5 to 15 minutes
+    id='check_reminders_for_notifications'
 )
 scheduler.start()
 
@@ -761,36 +770,89 @@ def login():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('dashboard'))
+    
     form = RegisterForm()
     
     if form.validate_on_submit():
-        if User.get_by_email(form.username.data):
-            flash('E-postadressen er allerede registrert!', 'error')
-            return render_template('register.html', form=form)
+        try:
+            # Valider e-post
+            email = form.username.data.lower().strip()
+            if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+                flash('Vennligst oppgi en gyldig e-postadresse.', 'error')
+                return render_template('register.html', form=form)
             
-        user_id = str(uuid.uuid4())
-        password_hash = generate_password_hash(form.password.data)
-        
-        user = User(user_id, form.username.data, form.username.data, password_hash)
-        success = user.save()
-        
-        if success:
-            # Send velkomst e-post
-            send_email(
-                to=user.email,
-                subject='Velkommen til Smart Påminner Pro',
+            # Sjekk om bruker eksisterer
+            if User.get_by_email(email):
+                flash('Denne e-postadressen er allerede registrert. Vennligst logg inn eller bruk glemt passord.', 'error')
+                return render_template('register.html', form=form)
+            
+            # Valider passord
+            password = form.password.data
+            if len(password) < 8:
+                flash('Passordet må være minst 8 tegn langt.', 'error')
+                return render_template('register.html', form=form)
+            
+            # Opprett bruker
+            user_id = str(uuid.uuid4())
+            password_hash = generate_password_hash(password)
+            username = email.split('@')[0]  # Bruk delen før @ som brukernavn
+            
+            # Opprett bruker i database
+            user = User(user_id, username, email, password_hash)
+            if not user.save():
+                raise Exception("Could not save user to database")
+            
+            # Send velkomst-e-post
+            welcome_sent = send_email(
+                to=email,
+                subject="Velkommen til Smart Påminner Pro!",
                 template='emails/welcome.html',
-                user=user
+                user={'username': username}
             )
             
             # Logg inn brukeren
             login_user(user, remember=True)
-            flash(f'Velkommen til Smart Påminner Pro, {user.username}! Din konto er opprettet.', 'success')
+            
+            # Gi tilbakemelding
+            flash(f'Velkommen til Smart Påminner Pro, {username}! Din konto er opprettet.', 'success')
+            if not welcome_sent:
+                flash('Merk: Kunne ikke sende velkomst-e-post. Sjekk spam-mappen eller kontakt support.', 'warning')
+            
+            # Initialiser brukerprofil
+            try:
+                init_user_profile(user_id)
+            except Exception as e:
+                logger.error(f"Kunne ikke opprette brukerprofil: {e}")
+                flash('Merk: Noen innstillinger måtte settes til standard. Du kan endre disse senere.', 'info')
+            
             return redirect(url_for('dashboard'))
-        else:
-            flash('Det oppstod en feil ved registrering. Vennligst prøv igjen.', 'error')
+            
+        except Exception as e:
+            logger.error(f"Registreringsfeil: {e}")
+            flash('Beklager, en feil oppstod under registrering. Vennligst prøv igjen.', 'error')
+            return render_template('register.html', form=form)
     
     return render_template('register.html', form=form)
+
+def init_user_profile(user_id):
+    """Initialiser brukerprofil med standardinnstillinger"""
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                INSERT INTO user_profiles (user_id, profile_type, preferences)
+                VALUES (%s, 'standard', '{"notifications": true, "daily_goal": 5}')
+            """, (user_id,))
+            conn.commit()
+            cur.close()
+        except Exception as e:
+            logger.error(f"Database error initializing user profile: {e}")
+            raise
+        finally:
+            return_db_connection(conn)
 
 @app.route('/logout')
 @login_required

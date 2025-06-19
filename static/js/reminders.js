@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const shareWith = document.getElementById('reminder-share').value.trim();
             
             if (!title || !date) {
-                alert('Title and date are required!');
+                alert('Tittel og dato er påkrevd!');
                 return;
             }
             

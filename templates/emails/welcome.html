@@ -1,34 +1,69 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
+    <meta charset="UTF-8">
     <title>Velkommen til Smart Påminner Pro</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #2E86AB;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px;
+        }
+        .content {
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #2E86AB;
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+    </style>
 </head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #007bff;">👋 Velkommen til Smart Påminner Pro!</h2>
-        
+<body>
+    <div class="header">
+        <h1>Velkommen til Smart Påminner Pro!</h1>
+    </div>
+    
+    <div class="content">
         <p>Hei {{ user.username }}!</p>
         
         <p>Takk for at du registrerte deg hos Smart Påminner Pro. Vi er glade for å ha deg med oss!</p>
         
-        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="margin-top: 0; color: #007bff;">Kom i gang:</h3>
-            <ul style="list-style-type: none; padding: 0;">
-                <li style="margin-bottom: 10px;">✅ Opprett din første påminnelse</li>
-                <li style="margin-bottom: 10px;">📝 Del notater med andre</li>
-                <li style="margin-bottom: 10px;">⚡ Prøv ulike modi for ulike behov</li>
-                <li style="margin-bottom: 10px;">⏰ Sett opp automatiske påminnelser</li>
-            </ul>
-        </div>
+        <p>Med Smart Påminner Pro kan du:</p>
+        <ul>
+            <li>Opprette og administrere påminnelser</li>
+            <li>Dele påminnelser med andre</li>
+            <li>Bruke ulike moduser tilpasset dine behov</li>
+            <li>Få varsler på e-post og i appen</li>
+            <li>Ha tilgang til dine påminnelser hvor som helst</li>
+        </ul>
         
-        <p>Hvis du har spørsmål eller trenger hjelp, kan du alltid kontakte oss.</p>
+        <p>Kom i gang ved å logge inn på din konto og opprette din første påminnelse:</p>
         
-        <hr style="margin: 30px 0;">
-        <p style="font-size: 12px; color: #666;">
-            Dette er en automatisk e-post fra Smart Påminner Pro.<br>
-            Ikke svar på denne e-posten.
+        <p style="text-align: center;">
+            <a href="{{ url_for('dashboard', _external=True) }}" class="button">Gå til Dashboard</a>
         </p>
+        
+        <p>Hvis du har spørsmål eller trenger hjelp, ikke nøl med å ta kontakt med oss.</p>
+        
+        <p>Vennlig hilsen,<br>Smart Påminner Pro-teamet</p>
     </div>
 </body>
 </html>
