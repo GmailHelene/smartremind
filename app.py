@@ -183,7 +183,7 @@ class User(UserMixin):
         self.username = username
         self.email = email
         self.password_hash = password_hash
-        self._app_mode = "DEFAULT"  # Changed to protected attribute
+        self._app_mode = "DEFAULT"
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -216,6 +216,73 @@ class User(UserMixin):
             u._app_mode = user_data.get('app_mode', "DEFAULT")
             return u
         return None
+    
+    @staticmethod
+    def get_by_email(email):
+        # Try database first
+        conn = get_db_connection()
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute('SELECT id, username, email, password_hash, app_mode FROM users WHERE email = ?', (email,))
+                user = cur.fetchone()
+                cur.close()
+                
+                if user:
+                    u = User(user[0], user[1], user[2], user[3])
+                    u._app_mode = user[4] if user[4] else "DEFAULT"
+                    return u
+            except Exception as e:
+                logger.error(f"Database error in User.get_by_email: {e}")
+            finally:
+                return_db_connection(conn)
+        
+        # Fallback to JSON
+        users = dm.load_data('users')
+        for user_id, user_data in users.items():
+            if user_data.get('email') == email:
+                u = User(
+                    user_id, 
+                    user_data.get('username', email), 
+                    email, 
+                    user_data.get('password_hash')
+                )
+                u._app_mode = user_data.get('app_mode', "DEFAULT")
+                return u
+        return None
+
+    def save(self):
+        """Save user to database and JSON"""
+        # Save to database if available
+        conn = get_db_connection()
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    'INSERT INTO users (id, username, email, password_hash, app_mode) VALUES (?, ?, ?, ?, ?) ON CONFLICT (email) DO NOTHING',
+                    (self.id, self.username, self.email, self.password_hash, self._app_mode)
+                )
+                conn.commit()
+                cur.close()
+                logger.info(f"User {self.email} saved to database")
+                return True
+            except Exception as e:
+                logger.error(f"Database error saving user: {e}")
+            finally: 
+                return_db_connection(conn)
+        
+        # Always save to JSON as backup
+        users = dm.load_data('users')
+        users[self.id] = {
+            'username': self.username,
+            'email': self.email,
+            'password_hash': self.password_hash,
+            'app_mode': self._app_mode,
+            'created': datetime.now().isoformat()
+        }
+        dm.save_data('users', users)
+        logger.info(f"User {self.email} saved to JSON")
+        return True
 
     @property
     def app_mode(self):
@@ -228,20 +295,25 @@ class User(UserMixin):
         if conn:
             try:
                 cur = conn.cursor()
-                cur.execute('UPDATE users SET app_mode = %s WHERE id = %s', (mode, self.id))
+                cur.execute('UPDATE users SET app_mode = ? WHERE id = ?', (mode, self.id))
                 conn.commit()
                 cur.close()
+                self._app_mode = mode
                 return
             except Exception as e:
-                logger.error(f"Database error setting user mode: {e}")
+                logger.error(f"Database error setting app_mode: {e}")
             finally:
                 return_db_connection(conn)
         
         # Fallback til JSON
-        users = dm.load_data('users')
-        if self.id in users:
-            users[self.id]['app_mode'] = mode
-            dm.save_data('users', users)
+        try:
+            users = dm.load_data('users')
+            if self.id in users:
+                users[self.id]['app_mode'] = mode
+                dm.save_data('users', users)
+            self._app_mode = mode
+        except Exception as e:
+            logger.error(f"JSON error setting app_mode: {e}")
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -729,34 +801,35 @@ def register():
             password_hash = generate_password_hash(password)
             username = email.split('@')[0]  # Bruk delen før @ som brukernavn
             logger.info(f"Creating new user with email: {email}")
-              # Opprett bruker i database
+            
+            # Opprett bruker i database
             user = User(user_id, username, email, password_hash)
             
             # Sett standardverdier
-            user.app_mode = 'light'
-            user.notification_advance = 30
-            user.email_notifications = True
+            user._app_mode = 'DEFAULT'  # Bruk protected attribute direkte her
             
             if not user.save():
                 logger.error("Failed to save user to database")
                 flash('Beklager, kunne ikke opprette brukeren. Prøv igjen senere.', 'error')
-                return render_template('register.html', form=form)
-
-            # Initialiser brukerprofil
+                return render_template('register.html', form=form)            # Initialiser brukerprofil
             try:
-                init_user_profile(user)
+                logger.info(f"Initializing user profile for {email}")
+                init_user_profile(user_id)
             except Exception as e:
-                logger.error(f"Error initializing user profile: {e}")
+                logger.error(f"Kunne ikke opprette brukerprofil for {email}: {e}")
                 # Fortsett selv om profil-initialisering feiler
+                flash('Merk: Noen innstillinger måtte settes til standard. Du kan endre disse senere.', 'info')
 
             # Send velkomst-e-post
             logger.info(f"Attempting to send welcome email to {email}")
+            welcome_sent = False
             try:
-                msg = Message('Velkommen til SmartReminder!',
-                            sender=app.config['MAIL_DEFAULT_SENDER'],
-                            recipients=[email])
-                msg.html = render_template('emails/welcome.html', username=username)
-                mail.send(msg)
+                welcome_sent = send_email(
+                    to=email,
+                    subject="Velkommen til Smart Påminner Pro!",
+                    template='emails/welcome.html',
+                    user={'username': username}
+                )
             except Exception as e:
                 logger.error(f"Failed to send welcome email: {e}")
                 # Fortsett selv om e-post feiler
@@ -764,15 +837,8 @@ def register():
             # Logg inn brukeren automatisk
             login_user(user)
             flash('Registrering vellykket! Velkommen til SmartReminder!', 'success')
-            return redirect(url_for('dashboard'))
-
-            # Initialiser brukerprofil
-            try:
-                logger.info(f"Initializing user profile for {email}")
-                init_user_profile(user_id)
-            except Exception as e:
-                logger.error(f"Kunne ikke opprette brukerprofil for {email}: {e}")
-                flash('Merk: Noen innstillinger måtte settes til standard. Du kan endre disse senere.', 'info')
+            if not welcome_sent:
+                flash('Merk: Kunne ikke sende velkomst-e-post. Sjekk spam-mappen eller kontakt support.', 'warning')
             
             return redirect(url_for('dashboard'))
             
@@ -791,7 +857,7 @@ def init_user_profile(user_id):
             cur = conn.cursor()
             cur.execute("""
                 INSERT INTO user_profiles (user_id, profile_type, preferences)
-                VALUES (%s, 'standard', '{"notifications": true, "daily_goal": 5}')
+                VALUES (?, 'standard', '{"notifications": true, "daily_goal": 5}')
             """, (user_id,))
             conn.commit()
             cur.close()
@@ -1419,72 +1485,6 @@ def set_mode():
     return redirect(request.referrer or url_for('dashboard'))
 
 # Oppdater User-klassen
-class User(UserMixin):
-    def __init__(self, user_id, username, email, password_hash=None):
-        self.id = user_id
-        self.username = username
-        self.email = email
-        self.password_hash = password_hash
-        self._app_mode = "DEFAULT"  # Changed to protected attribute
-    
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-    
-    @staticmethod
-    def get(user_id):
-        # Try database first
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute('SELECT id, username, email, password_hash, app_mode FROM users WHERE id = ?', (user_id,))
-                user = cur.fetchone()
-                cur.close()
-                
-                if user:
-                    u = User(user[0], user[1], user[2], user[3])
-                    u._app_mode = user[4] if user[4] else "DEFAULT"
-                    return u
-            except Exception as e:
-                logger.error(f"Database error in User.get: {e}")
-            finally:
-                return_db_connection(conn)
-        
-        # Fallback to JSON
-        users = dm.load_data('users')
-        if user_id in users:
-            user_data = users[user_id]
-            u = User(user_id, user_data['username'], user_data['email'], user_data.get('password_hash'))
-            u._app_mode = user_data.get('app_mode', "DEFAULT")
-            return u
-        return None
-
-    @property
-    def app_mode(self):
-        return self._app_mode
-    
-    @app_mode.setter
-    def app_mode(self, mode):
-        # Prøv database først
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute('UPDATE users SET app_mode = %s WHERE id = %s', (mode, self.id))
-                conn.commit()
-                cur.close()
-                return
-            except Exception as e:
-                logger.error(f"Database error setting user mode: {e}")
-            finally:
-                return_db_connection(conn)
-        
-        # Fallback til JSON
-        users = dm.load_data('users')
-        if self.id in users:
-            users[self.id]['app_mode'] = mode
-            dm.save_data('users', users)
-
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
