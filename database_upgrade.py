@@ -47,10 +47,6 @@ def upgrade_database():
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(id)
             );
-            """
-                completed_at TIMESTAMP,
-                notes TEXT
-            );
             """,
             """
             CREATE TABLE IF NOT EXISTS user_statistics (
