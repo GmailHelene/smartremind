@@ -89,19 +89,4 @@ self.addEventListener('fetch', function(event) {
                     });
             })
     );
-                    });
-                                cache.put(event.request, responseToCache);
-                            });
-
-                        return response;
-                    }
-                ).catch(function() {
-                    // If the network is unavailable and the requested resource isn't in the cache,
-                    // show the offline page for navigate requests
-                    if (event.request.mode === 'navigate') {
-                        return caches.match('/offline');
-                    }
-                });
-            })
-    );
 });
