@@ -1,18 +1,35 @@
 document.addEventListener('DOMContentLoaded', function() {
+    // Fjern loading states når siden er lastet
+    document.querySelectorAll('.loading-placeholder').forEach(element => {
+        element.style.display = 'none';
+    });
+    document.querySelectorAll('.content-container').forEach(element => {
+        element.style.display = 'block';
+    });
+
     // Mode selector functionality
     const modeSelector = document.getElementById('mode-selector');
     if (modeSelector) {
-        const modeLinks = modeSelector.querySelectorAll('.mode-link');
-        const modeForm = document.getElementById('mode-form');
-        const modeInput = document.getElementById('app_mode_input');
-        
-        modeLinks.forEach(link => {
-            link.addEventListener('click', function(e) {
-                e.preventDefault();
-                const mode = this.getAttribute('data-mode');
-                modeInput.value = mode;
-                modeForm.submit();
-            });
+        modeSelector.addEventListener('change', function(e) {
+            const mode = this.value;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/set_mode';
+            
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'app_mode';
+            input.value = mode;
+            
+            const csrf = document.createElement('input');
+            csrf.type = 'hidden';
+            csrf.name = 'csrf_token';
+            csrf.value = document.querySelector('meta[name="csrf-token"]').content;
+            
+            form.appendChild(csrf);
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
         });
     }
     

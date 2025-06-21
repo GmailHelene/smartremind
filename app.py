@@ -227,16 +227,48 @@ class SettingsForm(FlaskForm):
 
 # User Class
 class User(UserMixin):
-    def __init__(self, user_id, username, email, password_hash=None):
+    def __init__(self, user_id, username, email, password_hash=None, app_mode="DEFAULT"):
         self.id = user_id
         self.username = username
         self.email = email
         self.password_hash = password_hash
-        self._app_mode = "DEFAULT"  # Changed to protected attribute
+        self._app_mode = app_mode
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
     
+    @property
+    def app_mode(self):
+        return self._app_mode
+    
+    @app_mode.setter
+    def app_mode(self, mode):
+        if mode not in ['DEFAULT', 'ADHD_FRIENDLY', 'SILENT', 'FOCUS', 'DARK']:
+            raise ValueError("Invalid mode")
+        
+        conn = get_db_connection()
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute('UPDATE users SET app_mode = ? WHERE id = ?', (mode, self.id))
+                conn.commit()
+                self._app_mode = mode
+            except Exception as e:
+                logger.error(f"Database error setting user mode: {e}")
+                raise
+            finally:
+                cur.close()
+                return_db_connection(conn)
+        else:
+            # Fallback to JSON storage
+            users = dm.load_data('users')
+            if str(self.id) in users:
+                users[str(self.id)]['app_mode'] = mode
+                if dm.save_data('users', users):
+                    self._app_mode = mode
+                else:
+                    raise Exception("Could not save user mode")
+
     @staticmethod
     def get(user_id):
         # Try database first
@@ -265,32 +297,6 @@ class User(UserMixin):
             u._app_mode = user_data.get('app_mode', "DEFAULT")
             return u
         return None
-
-    @property
-    def app_mode(self):
-        return self._app_mode
-    
-    @app_mode.setter
-    def app_mode(self, mode):
-        # Prøv database først
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute('UPDATE users SET app_mode = %s WHERE id = %s', (mode, self.id))
-                conn.commit()
-                cur.close()
-                return
-            except Exception as e:
-                logger.error(f"Database error setting user mode: {e}")
-            finally:
-                return_db_connection(conn)
-        
-        # Fallback til JSON
-        users = dm.load_data('users')
-        if self.id in users:
-            users[self.id]['app_mode'] = mode
-            dm.save_data('users', users)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -1176,9 +1182,10 @@ def profile_setup_post():
 @app.route('/focus-mode')
 @login_required
 def focus_mode():
-    """Focus mode for ADHD/students"""
-    profile = get_user_profile(current_user.id)
-    return render_template('focus_mode.html', profile=profile)
+    """Handle focus mode view"""
+    return render_template('focus_session.html', 
+                         user=current_user,
+                         app_mode=current_user.app_mode)
 
 @app.route('/start-focus-session', methods=['POST'])
 @login_required
@@ -1395,13 +1402,43 @@ def setup_database():
 @app.route('/shared-notes')
 @login_required
 def shared_notes():
-    # Get shared notes from JSON since DB is not available
-    notes = dm.load_data('shared_notes')
-    user_notes = [n for n in notes if n.get('user_id') == current_user.email]
-    shared_with_me = [n for n in notes if current_user.email in n.get('shared_with', [])]
-    all_notes = user_notes + shared_with_me
+    """Handle shared notes view"""
+    notes = []
+    try:
+        # First try database
+        conn = get_db_connection()
+        if conn:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT n.id, n.title, n.content, n.created_at, n.updated_at, 
+                       COUNT(m.user_id) as member_count
+                FROM notes n
+                LEFT JOIN note_members m ON n.id = m.note_id
+                WHERE n.user_id = ? OR m.user_id = ?
+                GROUP BY n.id
+                ORDER BY n.updated_at DESC
+            """, (current_user.id, current_user.id))
+            notes = cur.fetchall()
+            cur.close()
+            conn.close()
+        
+        if not notes:
+            # Fallback to JSON
+            all_notes = dm.load_data('shared_notes')
+            notes = [
+                note for note in all_notes
+                if note.get('user_id') == current_user.email or
+                current_user.email in note.get('shared_with', [])
+            ]
+    except Exception as e:
+        logger.error(f"Error fetching shared notes: {e}")
+        flash('Kunne ikke laste notater. Prøv igjen senere.', 'error')
+        notes = []
     
-    return render_template('shared_notes.html', notes=all_notes)
+    return render_template('shared_notes.html', 
+                         notes=notes,
+                         user=current_user,
+                         app_mode=current_user.app_mode)
 
 @app.route('/shared-notes/create', methods=['GET', 'POST'])
 def create_shared_note():
@@ -1634,70 +1671,47 @@ def set_mode():
 
 # Oppdater User-klassen
 class User(UserMixin):
-    def __init__(self, user_id, username, email, password_hash=None):
+    def __init__(self, user_id, username, email, password_hash=None, app_mode="DEFAULT"):
         self.id = user_id
         self.username = username
         self.email = email
         self.password_hash = password_hash
-        self._app_mode = "DEFAULT"  # Changed to protected attribute
+        self._app_mode = app_mode
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
     
-    @staticmethod
-    def get(user_id):
-        # Try database first
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute('SELECT id, username, email, password_hash, app_mode FROM users WHERE id = ?', (user_id,))
-                user = cur.fetchone()
-                cur.close()
-                
-                if user:
-                    u = User(user[0], user[1], user[2], user[3])
-                    u._app_mode = user[4] if user[4] else "DEFAULT"
-                    return u
-            except Exception as e:
-                logger.error(f"Database error in User.get: {e}")
-            finally:
-                return_db_connection(conn)
-        
-        # Fallback to JSON
-        users = dm.load_data('users')
-        if user_id in users:
-            user_data = users[user_id]
-            u = User(user_id, user_data['username'], user_data['email'], user_data.get('password_hash'))
-            u._app_mode = user_data.get('app_mode', "DEFAULT")
-            return u
-        return None
-
     @property
     def app_mode(self):
         return self._app_mode
     
     @app_mode.setter
     def app_mode(self, mode):
-        # Prøv database først
+        if mode not in ['DEFAULT', 'ADHD_FRIENDLY', 'SILENT', 'FOCUS', 'DARK']:
+            raise ValueError("Invalid mode")
+        
         conn = get_db_connection()
         if conn:
             try:
                 cur = conn.cursor()
-                cur.execute('UPDATE users SET app_mode = %s WHERE id = %s', (mode, self.id))
+                cur.execute('UPDATE users SET app_mode = ? WHERE id = ?', (mode, self.id))
                 conn.commit()
-                cur.close()
-                return
+                self._app_mode = mode
             except Exception as e:
                 logger.error(f"Database error setting user mode: {e}")
+                raise
             finally:
+                cur.close()
                 return_db_connection(conn)
-        
-        # Fallback til JSON
-        users = dm.load_data('users')
-        if self.id in users:
-            users[self.id]['app_mode'] = mode
-            dm.save_data('users', users)
+        else:
+            # Fallback to JSON storage
+            users = dm.load_data('users')
+            if str(self.id) in users:
+                users[str(self.id)]['app_mode'] = mode
+                if dm.save_data('users', users):
+                    self._app_mode = mode
+                else:
+                    raise Exception("Could not save user mode")
 
 # App mode route
 @app.route('/change_app_mode', methods=['POST'])
