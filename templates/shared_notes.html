@@ -32,9 +32,9 @@
                         {{ note.content if note.content else 'Ingen innhold ennå...' }}
                     </p>
                     <p class="small text-muted">
-                        <i class="fas fa-users"></i> {{ note.members|length }} deltakere
+                        <i class="fas fa-users"></i> {{ (note.members|default([]))|length }} deltakere
                         <br>
-                        <i class="fas fa-clock"></i> Sist oppdatert: {{ note.updated_at|as_datetime }}
+                        <i class="fas fa-clock"></i> Sist oppdatert: {{ note.updated_at|as_datetime if note.updated_at else 'Ukjent' }}
                     </p>
                 </div>
                 <div class="card-footer bg-light">

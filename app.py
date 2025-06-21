@@ -1403,42 +1403,41 @@ def setup_database():
 @login_required
 def shared_notes():
     """Handle shared notes view"""
-    notes = []
     try:
-        # First try database
-        conn = get_db_connection()
-        if conn:
-            cur = conn.cursor()
-            cur.execute("""
-                SELECT n.id, n.title, n.content, n.created_at, n.updated_at, 
-                       COUNT(m.user_id) as member_count
-                FROM notes n
-                LEFT JOIN note_members m ON n.id = m.note_id
-                WHERE n.user_id = ? OR m.user_id = ?
-                GROUP BY n.id
-                ORDER BY n.updated_at DESC
-            """, (current_user.id, current_user.id))
-            notes = cur.fetchall()
-            cur.close()
-            conn.close()
+        # Load notes from JSON storage
+        all_notes = dm.load_data('shared_notes')
         
-        if not notes:
-            # Fallback to JSON
-            all_notes = dm.load_data('shared_notes')
-            notes = [
-                note for note in all_notes
-                if note.get('user_id') == current_user.email or
-                current_user.email in note.get('shared_with', [])
-            ]
+        # Filter notes for current user
+        user_notes = []
+        for note in all_notes:
+            if note.get('user_id') == current_user.email or current_user.email in note.get('shared_with', []):
+                # Ensure all required fields exist
+                note_data = {
+                    'id': note.get('id', ''),
+                    'title': note.get('title', 'Uten tittel'),
+                    'content': note.get('content', ''),
+                    'created_at': note.get('created_at', datetime.now().isoformat()),
+                    'updated_at': note.get('updated_at', datetime.now().isoformat()),
+                    'members': note.get('members', []),
+                    'shared_with': note.get('shared_with', [])
+                }
+                user_notes.append(note_data)
+        
+        # Sort by update time
+        user_notes.sort(key=lambda x: x['updated_at'], reverse=True)
+        
+        return render_template('shared_notes.html', 
+                             notes=user_notes,
+                             user=current_user,
+                             app_mode=current_user.app_mode)
+                             
     except Exception as e:
         logger.error(f"Error fetching shared notes: {e}")
         flash('Kunne ikke laste notater. Prøv igjen senere.', 'error')
-        notes = []
-    
-    return render_template('shared_notes.html', 
-                         notes=notes,
-                         user=current_user,
-                         app_mode=current_user.app_mode)
+        return render_template('shared_notes.html', 
+                             notes=[],
+                             user=current_user,
+                             app_mode=current_user.app_mode)
 
 @app.route('/shared-notes/create', methods=['GET', 'POST'])
 def create_shared_note():
@@ -1741,6 +1740,22 @@ def change_app_mode():
         flash('Det oppstod en feil ved endring av appmodus.', 'error')
         
     return redirect(request.referrer or url_for('settings'))
+
+# Custom Jinja2 filters
+@app.template_filter('as_datetime')
+def as_datetime(value):
+    """Convert ISO datetime string to formatted date"""
+    if not value:
+        return ''
+    try:
+        if isinstance(value, str):
+            dt = datetime.fromisoformat(value)
+        else:
+            dt = value
+        return dt.strftime('%d.%m.%Y %H:%M')
+    except Exception as e:
+        logger.error(f"Error formatting datetime: {e}")
+        return value
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
