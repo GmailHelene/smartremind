@@ -1551,6 +1551,10 @@ def internal_server_error(e):
 @login_required
 def set_mode():
     """Set the application mode for the current user"""
+    if not request.form.get('csrf_token'):
+        flash('CSRF-token mangler', 'error')
+        return redirect(url_for('settings'))
+        
     mode = request.form.get('app_mode', 'DEFAULT')
     if mode not in ['DEFAULT', 'ADHD_FRIENDLY', 'SILENT', 'FOCUS', 'DARK']:
         flash('Ugyldig modus valgt', 'error')
