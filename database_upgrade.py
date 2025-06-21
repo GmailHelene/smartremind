@@ -1,55 +1,51 @@
-import os
-import psycopg2
-from psycopg2 import sql
+import sqlite3
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def upgrade_database():
     # Database connection
-    conn = psycopg2.connect(
-        host=os.getenv('PGHOST'),
-        port=os.getenv('PGPORT'),
-        database=os.getenv('PGDATABASE'),
-        user=os.getenv('PGUSER'),
-        password=os.getenv('PGPASSWORD')
-    )
+    conn = sqlite3.connect('smartreminder.db')
     
     cursor = conn.cursor()
     
     try:
-        # SQL kommandoer
+        # SQL kommandoer for SQLite
         sql_commands = [
             """
-            CREATE TABLE IF NOT EXISTS user_profiles (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                profile_type VARCHAR(50) DEFAULT 'standard',
-                preferences JSONB DEFAULT '{}',
-                accessibility_settings JSONB DEFAULT '{}',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            """,
-            """
-            CREATE TABLE IF NOT EXISTS custom_categories (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                name VARCHAR(100) NOT NULL,
-                color VARCHAR(7) DEFAULT '#2E86AB',
-                icon VARCHAR(50) DEFAULT 'bell',
-                profile_specific BOOLEAN DEFAULT FALSE,
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                username TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                app_mode TEXT DEFAULT 'DEFAULT',
+                notification_advance INTEGER DEFAULT 30,
+                email_notifications INTEGER DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """,
             """
-            CREATE TABLE IF NOT EXISTS focus_sessions (
-                id SERIAL PRIMARY KEY,
-                user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-                session_type VARCHAR(50) DEFAULT 'pomodoro',
-                duration_minutes INTEGER DEFAULT 25,
-                break_duration INTEGER DEFAULT 5,
-                completed BOOLEAN DEFAULT FALSE,
-                started_at TIMESTAMP,
-                completed_at TIMESTAMP,
-                notes TEXT
+            CREATE TABLE IF NOT EXISTS reminders (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                date TIMESTAMP NOT NULL,
+                completed INTEGER DEFAULT 0,
+                notification_sent INTEGER DEFAULT 0,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS notes (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                content TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users(id)
             );
             """,
             """

@@ -1,0 +1,32 @@
+{
+    "title": "Idémyldring",
+    "description": "Mal for kreativ idémyldring og utforskning av nye konsepter",
+    "sections": [
+        {
+            "title": "Ideer",
+            "type": "ideas",
+            "description": "Legg inn alle ideer her, uansett hvor ville de er!"
+        },
+        {
+            "title": "Kategorisering",
+            "type": "categories",
+            "description": "Grupper lignende ideer sammen"
+        },
+        {
+            "title": "Evaluering",
+            "type": "voting",
+            "description": "Stem på de beste ideene"
+        },
+        {
+            "title": "Handlingsplan",
+            "type": "action_items",
+            "description": "Konkrete steg videre"
+        }
+    ],
+    "features": [
+        "voting",
+        "categories",
+        "timer",
+        "anonymous_mode"
+    ]
+}

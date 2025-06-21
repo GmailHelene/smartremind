@@ -1,7 +1,15 @@
 {% extends "base.html" %}
 
+{% block title %}Fokusøkt - Smart Påminner Pro{% endblock %}
+
 {% block head %}
 <style>
+.focus-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
 .focus-timer {
     text-align: center;
     padding: 2rem;
@@ -52,6 +60,59 @@
     text-align: center;
     cursor: pointer;
     transition: all 0.3s ease;
+    background: white;
+}
+
+.session-type-card:hover,
+.session-type-card.active {
+    border-color: #2E86AB;
+    box-shadow: 0 4px 12px rgba(46, 134, 171, 0.2);
+    transform: translateY(-2px);
+}
+
+.session-type-card i {
+    font-size: 2rem;
+    color: #2E86AB;
+    margin-bottom: 1rem;
+}
+
+.reminders-sidebar {
+    background: #f8f9fa;
+    border-radius: 15px;
+    padding: 1.5rem;
+}
+
+.reminder-mini {
+    background: white;
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #e0e0e0;
+}
+
+.reminder-mini:hover {
+    border-color: #2E86AB;
+}
+
+.settings-panel {
+    background: white;
+    border-radius: 15px;
+    padding: 1.5rem;
+    margin-top: 2rem;
+}
+
+.session-history {
+    margin-top: 2rem;
+}
+
+.history-item {
+    padding: 1rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+    border-radius: 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
 }
 
 .session-type-card:hover {
@@ -85,314 +146,340 @@
 {% endblock %}
 
 {% block content %}
-<div class="container">
-    <h1>🎯 Fokusøkt</h1>
-    
-    <!-- Session Type Selection -->
-    <div class="session-types">
-        <div class="session-type-card active" data-type="pomodoro" data-duration="25">
-            <h3>🍅 Pomodoro</h3>
-            <p>25 min fokus + 5 min pause</p>
-        </div>
-        <div class="session-type-card" data-type="deep-work" data-duration="50">
-            <h3>🔥 Deep Work</h3>
-            <p>50 min intens fokus</p>
-        </div>
-        <div class="session-type-card" data-type="gentle" data-duration="15">
-            <h3>🌸 Gentle Focus</h3>
-            <p>15 min lett fokus</p>
-        </div>
-        <div class="session-type-card" data-type="study" data-duration="45">
-            <h3>📚 Studieøkt</h3>
-            <p>45 min studering</p>
-        </div>
-    </div>
+<div class="focus-container">
+    <div class="row">
+        <div class="col-lg-8">
+            <!-- Fokustimer og kontroller -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h3 class="mb-0"><i class="fas fa-clock"></i> Fokusøkt</h3>
+                </div>
+                <div class="card-body">
+                    <!-- Øktstyper -->
+                    <div class="session-types mb-4">
+                        <div class="session-type-card" data-duration="25" data-type="pomodoro">
+                            <i class="fas fa-tomato"></i>
+                            <h5>Pomodoro</h5>
+                            <p>25 min fokus, 5 min pause</p>
+                        </div>
+                        <div class="session-type-card" data-duration="45" data-type="deep">
+                            <i class="fas fa-brain"></i>
+                            <h5>Dyp fokus</h5>
+                            <p>45 min fokus, 15 min pause</p>
+                        </div>
+                        <div class="session-type-card" data-duration="15" data-type="quick">
+                            <i class="fas fa-bolt"></i>
+                            <h5>Rask økt</h5>
+                            <p>15 min fokus, 3 min pause</p>
+                        </div>
+                    </div>
 
-    <!-- Timer Display -->
-    <div class="focus-timer">
-        <div class="progress-ring">
-            <svg width="200" height="200">
-                <circle class="progress-ring-circle" id="progress-circle"></circle>
-            </svg>
-        </div>
-        <div class="timer-display" id="timer-display">25:00</div>
-        <div class="session-status" id="session-status">Klar til å starte</div>
-    </div>
+                    <!-- Timer -->
+                    <div class="focus-timer">
+                        <div class="progress-ring">
+                            <svg>
+                                <circle class="progress-ring-circle"></circle>
+                            </svg>
+                            <div class="timer-display">
+                                25:00
+                            </div>
+                        </div>
+                        <div class="session-controls">
+                            <button class="session-btn btn-start">
+                                <i class="fas fa-play"></i> Start
+                            </button>
+                            <button class="session-btn btn-pause" style="display: none;">
+                                <i class="fas fa-pause"></i> Pause
+                            </button>
+                            <button class="session-btn btn-stop" style="display: none;">
+                                <i class="fas fa-stop"></i> Avslutt
+                            </button>
+                        </div>
+                    </div>
 
-    <!-- Controls -->
-    <div class="session-controls">
-        <button class="session-btn btn-start" id="start-btn">▶️ Start</button>
-        <button class="session-btn btn-pause" id="pause-btn" disabled>⏸️ Pause</button>
-        <button class="session-btn btn-stop" id="stop-btn" disabled>⏹️ Stopp</button>
-    </div>
-
-    <!-- Session Notes -->
-    <div class="session-notes" style="margin-top: 2rem;">
-        <h3>📝 Notater</h3>
-        <textarea id="session-notes" placeholder="Hva skal du fokusere på i denne økten?" 
-                  style="width: 100%; height: 100px; padding: 1rem; border-radius: 10px; border: 1px solid #ddd;"></textarea>
-    </div>
-
-    <!-- Statistics -->
-    <div class="focus-stats">
-        <h3>📊 Dagens statistikk</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-top: 1rem;">
-            <div class="stat-card">
-                <div class="stat-number">{{ stats.sessions_today or 0 }}</div>
-                <div class="stat-label">Økter i dag</div>
+                    <!-- Notater -->
+                    <div class="session-notes">
+                        <h5><i class="fas fa-pencil-alt"></i> Øktnotater</h5>
+                        <textarea class="form-control" rows="3" placeholder="Skriv ned tanker og ideer under økten..."></textarea>
+                    </div>
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-number">{{ stats.total_time_today or 0 }}</div>
-                <div class="stat-label">Minutter fokus</div>
+
+            <!-- Økthistorikk -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> Tidligere økter</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_sessions %}
+                        {% for session in recent_sessions %}
+                        <div class="history-item">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h6 class="mb-1">{{ session.session_type }}</h6>
+                                    <small class="text-muted">
+                                        {{ session.completed_at|as_datetime }} - {{ session.duration }} minutter
+                                    </small>
+                                </div>
+                                {% if session.notes %}
+                                <button class="btn btn-link btn-sm" data-bs-toggle="collapse" data-bs-target="#notes-{{ loop.index }}">
+                                    <i class="fas fa-chevron-down"></i>
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% if session.notes %}
+                            <div class="collapse" id="notes-{{ loop.index }}">
+                                <div class="mt-2">
+                                    <small>{{ session.notes }}</small>
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted text-center">Ingen tidligere økter</p>
+                    {% endif %}
+                </div>
             </div>
-            <div class="stat-card">
-                <div class="stat-number">{{ stats.streak_days or 0 }}</div>
-                <div class="stat-label">Dager på rad</div>
+        </div>
+
+        <div class="col-lg-4">
+            <!-- Dagens påminnelser -->
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-tasks"></i> Dagens påminnelser</h5>
+                </div>
+                <div class="card-body">
+                    <div class="reminders-sidebar">
+                        {% if reminders %}
+                            {% for reminder in reminders %}
+                            <div class="reminder-mini">
+                                <h6 class="mb-1">{{ reminder.title }}</h6>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock"></i> {{ reminder.datetime|as_datetime }}
+                                </small>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted text-center">Ingen påminnelser for i dag</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Innstillinger -->
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0"><i class="fas fa-cog"></i> Innstillinger</h5>
+                </div>
+                <div class="card-body">
+                    <div class="settings-panel">
+                        <div class="mb-3">
+                            <label class="form-label">Varsler</label>
+                            <select class="form-select" id="notificationType">
+                                <option value="sound" {% if settings.notification_type == 'sound' %}selected{% endif %}>Lyd</option>
+                                <option value="popup" {% if settings.notification_type == 'popup' %}selected{% endif %}>Popup</option>
+                                <option value="both" {% if settings.notification_type == 'both' %}selected{% endif %}>Begge</option>
+                                <option value="none" {% if settings.notification_type == 'none' %}selected{% endif %}>Ingen</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Bakgrunnslyd</label>
+                            <select class="form-select" id="ambientSound">
+                                <option value="none" {% if settings.ambient_sound == 'none' %}selected{% endif %}>Ingen</option>
+                                <option value="white-noise" {% if settings.ambient_sound == 'white-noise' %}selected{% endif %}>Hvit støy</option>
+                                <option value="rain" {% if settings.ambient_sound == 'rain' %}selected{% endif %}>Regn</option>
+                                <option value="coffee-shop" {% if settings.ambient_sound == 'coffee-shop' %}selected{% endif %}>Kafé</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Automatisk start av neste økt</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="autoStart">
+                                <label class="form-check-label" for="autoStart">Start neste økt automatisk</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
+{% block extra_js %}
 <script>
+// Timer-funksjonalitet
 class FocusTimer {
     constructor() {
-        this.duration = 25 * 60; // 25 minutes in seconds
+        this.duration = 25 * 60; // Standard 25 minutter
         this.timeLeft = this.duration;
         this.isRunning = false;
-        this.isPaused = false;
-        this.sessionId = null;
-        this.sessionType = 'pomodoro';
-        this.interval = null;
-        
-        this.initializeElements();
-        this.bindEvents();
+        this.timer = null;
+        this.setupEventListeners();
     }
-    
-    initializeElements() {
-        this.timerDisplay = document.getElementById('timer-display');
-        this.statusDisplay = document.getElementById('session-status');
-        this.startBtn = document.getElementById('start-btn');
-        this.pauseBtn = document.getElementById('pause-btn');
-        this.stopBtn = document.getElementById('stop-btn');
-        this.progressCircle = document.getElementById('progress-circle');
-        this.sessionNotes = document.getElementById('session-notes');
-    }
-    
-    bindEvents() {
-        this.startBtn.addEventListener('click', () => this.startSession());
-        this.pauseBtn.addEventListener('click', () => this.pauseSession());
-        this.stopBtn.addEventListener('click', () => this.stopSession());
-        
-        // Session type selection
+
+    setupEventListeners() {
         document.querySelectorAll('.session-type-card').forEach(card => {
-            card.addEventListener('click', () => this.selectSessionType(card));
+            card.addEventListener('click', () => {
+                const duration = parseInt(card.dataset.duration);
+                this.setDuration(duration * 60);
+                document.querySelectorAll('.session-type-card').forEach(c => c.classList.remove('active'));
+                card.classList.add('active');
+            });
         });
+
+        document.querySelector('.btn-start').addEventListener('click', () => this.start());
+        document.querySelector('.btn-pause').addEventListener('click', () => this.pause());
+        document.querySelector('.btn-stop').addEventListener('click', () => this.stop());
     }
-    
-    selectSessionType(card) {
-        // Remove active class from all cards
-        document.querySelectorAll('.session-type-card').forEach(c => c.classList.remove('active'));
-        card.classList.add('active');
-        
-        this.sessionType = card.dataset.type;
-        this.duration = parseInt(card.dataset.duration) * 60;
-        this.timeLeft = this.duration;
+
+    setDuration(seconds) {
+        this.duration = seconds;
+        this.timeLeft = seconds;
         this.updateDisplay();
     }
-    
-    async startSession() {
-        if (!this.isRunning) {
-            // Start new session
-            const response = await fetch('/focus-session/start', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `session_type=${this.sessionType}&duration=${this.duration / 60}&notes=${this.sessionNotes.value}`
-            });
-            
-            const data = await response.json();
-            this.sessionId = data.session_id;
-        }
-        
-        this.isRunning = true;
-        this.isPaused = false;
-        this.startBtn.disabled = true;
-        this.pauseBtn.disabled = false;
-        this.stopBtn.disabled = false;
-        this.statusDisplay.textContent = 'Fokuserer...';
-        
-        this.interval = setInterval(() => {
-            this.timeLeft--;
-            this.updateDisplay();
-            
-            if (this.timeLeft <= 0) {
-                this.completeSession();
-            }
-        }, 1000);
-    }
-    
-    pauseSession() {
-        if (this.isRunning && !this.isPaused) {
-            clearInterval(this.interval);
-            this.isPaused = true;
-            this.startBtn.disabled = false;
-            this.statusDisplay.textContent = 'Pauset';
-        }
-    }
-    
-    async stopSession() {
-        clearInterval(this.interval);
-        this.isRunning = false;
-        this.isPaused = false;
-        this.startBtn.disabled = false;
-        this.pauseBtn.disabled = true;
-        this.stopBtn.disabled = true;
-        this.statusDisplay.textContent = 'Avbrutt';
-        
-        if (this.sessionId) {
-            await fetch(`/focus-session/stop/${this.sessionId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `notes=${this.sessionNotes.value}`
-            });
-        }
-        
-        this.resetTimer();
-    }
-    
-    async completeSession() {
-        clearInterval(this.interval);
-        this.isRunning = false;
-        this.startBtn.disabled = false;
-        this.pauseBtn.disabled = true;
-        this.stopBtn.disabled = true;
-        this.statusDisplay.textContent = '🎉 Økten fullført!';
-        
-        // Play completion sound
-        this.playCompletionSound();
-        
-        // Show completion notification
-        if (Notification.permission === 'granted') {
-            new Notification('Fokusøkt fullført!', {
-                body: 'Godt jobbet! Ta en velfortjent pause.',
-                icon: '/images/icon-96x96.png'
-            });
-        }
-        
-        if (this.sessionId) {
-            await fetch(`/focus-session/complete/${this.sessionId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `notes=${this.sessionNotes.value}`
-            });
-        }
-        
-        // Show celebration animation
-        this.showCelebration();
-        
-        setTimeout(() => {
-            this.resetTimer();
-        }, 3000);
-    }
-    
+
     updateDisplay() {
         const minutes = Math.floor(this.timeLeft / 60);
         const seconds = this.timeLeft % 60;
-        this.timerDisplay.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+        const display = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        document.querySelector('.timer-display').textContent = display;
         
-        // Update progress circle
-        const progress = (this.duration - this.timeLeft) / this.duration;
-        const circumference = 2 * Math.PI * 90;
+        // Oppdater progressring
+        const circle = document.querySelector('.progress-ring-circle');
+        const radius = circle.r.baseVal.value;
+        const circumference = radius * 2 * Math.PI;
+        const progress = this.timeLeft / this.duration;
         const offset = circumference - (progress * circumference);
-        this.progressCircle.style.strokeDashoffset = offset;
+        circle.style.strokeDashoffset = offset;
     }
-    
-    resetTimer() {
+
+    start() {
+        if (!this.isRunning) {
+            this.isRunning = true;
+            document.querySelector('.btn-start').style.display = 'none';
+            document.querySelector('.btn-pause').style.display = 'inline-block';
+            document.querySelector('.btn-stop').style.display = 'inline-block';
+            
+            this.timer = setInterval(() => {
+                if (this.timeLeft > 0) {
+                    this.timeLeft--;
+                    this.updateDisplay();
+                } else {
+                    this.complete();
+                }
+            }, 1000);
+        }
+    }
+
+    pause() {
+        if (this.isRunning) {
+            this.isRunning = false;
+            clearInterval(this.timer);
+            document.querySelector('.btn-start').style.display = 'inline-block';
+            document.querySelector('.btn-pause').style.display = 'none';
+        }
+    }
+
+    stop() {
+        this.isRunning = false;
+        clearInterval(this.timer);
         this.timeLeft = this.duration;
         this.updateDisplay();
-        this.progressCircle.style.strokeDashoffset = 565.48;
+        document.querySelector('.btn-start').style.display = 'inline-block';
+        document.querySelector('.btn-pause').style.display = 'none';
+        document.querySelector('.btn-stop').style.display = 'none';
     }
-    
-    playCompletionSound() {
-        // Create audio context for completion sound
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-        
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-        
-        oscillator.frequency.setValueAtTime(800, audioContext.currentTime);
-        oscillator.frequency.setValueAtTime(600, audioContext.currentTime + 0.1);
-        oscillator.frequency.setValueAtTime(800, audioContext.currentTime + 0.2);
-        
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
-        
-        oscillator.start(audioContext.currentTime);
-        oscillator.stop(audioContext.currentTime + 0.3);
+
+    complete() {
+        this.stop();
+        this.showNotification();
+        this.saveSession();
     }
-    
-    showCelebration() {
-        // Add celebration animation
-        const celebration = document.createElement('div');
-        celebration.innerHTML = '🎉✨🎊';
-        celebration.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 3rem;
-            z-index: 1000;
-            animation: celebration 2s ease-out;
-        `;
+
+    showNotification() {
+        const notificationType = document.getElementById('notificationType').value;
         
-        document.body.appendChild(celebration);
+        if (notificationType === 'sound' || notificationType === 'both') {
+            // Spill av lyd
+            const audio = new Audio('/static/sounds/complete.mp3');
+            audio.play();
+        }
         
-        setTimeout(() => {
-            celebration.remove();
-        }, 2000);
+        if (notificationType === 'popup' || notificationType === 'both') {
+            // Vis popup
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Fokusøkt fullført!', {
+                    body: 'Ta en velfortjent pause.',
+                    icon: '/static/icons/icon-192x192.png'
+                });
+            }
+        }
+    }
+
+    saveSession() {
+        const notes = document.querySelector('.session-notes textarea').value;
+        
+        fetch('/focus-session/complete', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify({
+                duration: this.duration / 60,
+                notes: notes
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (document.getElementById('autoStart').checked) {
+                    // Start pause-timer
+                    this.startBreak();
+                }
+            }
+        });
+    }
+
+    startBreak() {
+        // Start en 5-minutters pause
+        this.setDuration(5 * 60);
+        this.start();
     }
 }
 
-// Initialize timer when page loads
+// Initialiser timer når siden lastes
 document.addEventListener('DOMContentLoaded', () => {
-    new FocusTimer();
+    const timer = new FocusTimer();
+    
+    // Be om tillatelse til varsler
+    if ('Notification' in window) {
+        Notification.requestPermission();
+    }
+    
+    // Håndter innstillingsendringer
+    document.getElementById('ambientSound').addEventListener('change', function() {
+        const sound = this.value;
+        if (sound !== 'none') {
+            // Start bakgrunnslyd
+            const audio = document.getElementById('ambientAudio') || new Audio(`/static/sounds/${sound}.mp3`);
+            audio.id = 'ambientAudio';
+            audio.loop = true;
+            audio.volume = 0.3;
+            audio.play();
+        } else {
+            // Stopp bakgrunnslyd
+            const audio = document.getElementById('ambientAudio');
+            if (audio) {
+                audio.pause();
+                audio.remove();
+            }
+        }
+    });
 });
-
-// Add CSS for celebration animation
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes celebration {
-        0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-        50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
-        100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
-    }
-    
-    .stat-card {
-        background: white;
-        padding: 1rem;
-        border-radius: 10px;
-        text-align: center;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-    
-    .stat-number {
-        font-size: 2rem;
-        font-weight: bold;
-        color: #2E86AB;
-    }
-    
-    .stat-label {
-        color: #666;
-        font-size: 0.9rem;
-    }
-`;
-document.head.appendChild(style);
 </script>
+{% endblock %}
 {% endblock %}

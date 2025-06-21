@@ -39,6 +39,8 @@ class Config:
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', 'Smart Påminner <noreply@smartpaminner.no>')
+    NOTIFICATION_ADVANCE_MINUTES = int(os.environ.get('NOTIFICATION_ADVANCE_MINUTES', 30))
 
 # Apply configuration
 app.config.from_object(Config)
@@ -99,83 +101,36 @@ dm = DataManager()
 
 # Initialize database
 def init_db():
+    """Initialize database tables"""
     try:
         conn = get_db_connection()
-        if not conn:
-            logger.error("Failed to connect to database")
-            return False
+        if conn:
+            cur = conn.cursor()
             
-        cur = conn.cursor()
-          # Create users table
-        cur.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            username TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            app_mode TEXT DEFAULT 'DEFAULT',
-            created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
-        
-        # Create reminders table
-        cur.execute('''
-        CREATE TABLE IF NOT EXISTS reminders (
-            id TEXT PRIMARY KEY,
-            user_id TEXT REFERENCES users(id),
-            title TEXT NOT NULL,
-            description TEXT,
-            due_date TIMESTAMP,
-            category TEXT DEFAULT 'general',
-            priority TEXT DEFAULT 'medium',
-            completed BOOLEAN DEFAULT FALSE,
-            difficulty_level INTEGER DEFAULT 1,
-            estimated_duration INTEGER DEFAULT 15,
-            energy_level TEXT DEFAULT 'medium',
-            context_tags TEXT[],
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        ''')
-        
-        # Create focus_sessions table
-        cur.execute('''
-        CREATE TABLE IF NOT EXISTS focus_sessions (
-            id SERIAL PRIMARY KEY,
-            user_id TEXT REFERENCES users(id),
-            session_type TEXT DEFAULT 'pomodoro',
-            duration_minutes INTEGER,
-            started_at TIMESTAMP,
-            completed_at TIMESTAMP,
-            completed BOOLEAN DEFAULT FALSE,
-            notes TEXT
-        )
-        ''')
-        
-        # Create user_statistics table
-        cur.execute('''
-        CREATE TABLE IF NOT EXISTS user_statistics (
-            id SERIAL PRIMARY KEY,
-            user_id TEXT REFERENCES users(id),
-            date DATE,
-            focus_sessions_completed INTEGER DEFAULT 0,
-            total_focus_time INTEGER DEFAULT 0,
-            points INTEGER DEFAULT 0,
-            UNIQUE(user_id, date)
-        )
-        ''')
-        
-        conn.commit()
-        cur.close()
-        logger.info("Database tables initialized!")
-        return True
+            # Create users table if it doesn't exist
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    id TEXT PRIMARY KEY,
+                    username TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            conn.commit()
+            cur.close()
+            logger.info("Database tables initialized!")
+            return True
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
         return False
     finally:
-        return_db_connection(conn)
+        if conn:
+            return_db_connection(conn)
 
-# Initialize database
-use_db = init_db()
+# Initialize database on startup
+init_db()
 
 # Login manager setup
 login_manager = LoginManager()
@@ -214,12 +169,28 @@ class NoteForm(FlaskForm):
 
 class SettingsForm(FlaskForm):
     app_mode = SelectField('Appmodus', choices=[
-        ('DEFAULT', 'Standard'), 
-        ('ADHD_FRIENDLY', 'ADHD-Vennlig'), 
-        ('SILENT', 'Stillemodus'), 
-        ('FOCUS', 'Fokusmodus'), 
+        ('DEFAULT', 'Standard'),
+        ('ADHD_FRIENDLY', 'ADHD-Vennlig'),
+        ('SILENT', 'Stillemodus'),
+        ('FOCUS', 'Fokusmodus'),
         ('DARK', 'Mørk modus')
     ])
+    
+    notification_time = SelectField('Påminnelsestid', choices=[
+        ('5', '5 minutter før'),
+        ('10', '10 minutter før'),
+        ('15', '15 minutter før'),
+        ('30', '30 minutter før'),
+        ('60', '1 time før'),
+        ('120', '2 timer før')
+    ])
+    
+    email_notifications = SelectField('E-postvarsler', choices=[
+        ('all', 'Alle varsler'),
+        ('important', 'Kun viktige'),
+        ('none', 'Ingen')
+    ])
+    
     submit = SubmitField('Lagre innstillinger')
 
 # User Class
@@ -229,7 +200,7 @@ class User(UserMixin):
         self.username = username
         self.email = email
         self.password_hash = password_hash
-        self.app_mode = "DEFAULT"
+        self._app_mode = "DEFAULT"  # Changed to protected attribute
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -241,83 +212,53 @@ class User(UserMixin):
         if conn:
             try:
                 cur = conn.cursor()
-                cur.execute('SELECT id, username, email, password_hash FROM users WHERE id = ?', (user_id,))
+                cur.execute('SELECT id, username, email, password_hash, app_mode FROM users WHERE id = ?', (user_id,))
                 user = cur.fetchone()
                 cur.close()
                 
                 if user:
-                    return User(user[0], user[1], user[2], user[3])
+                    u = User(user[0], user[1], user[2], user[3])
+                    u._app_mode = user[4] if user[4] else "DEFAULT"
+                    return u
             except Exception as e:
                 logger.error(f"Database error in User.get: {e}")
             finally:
                 return_db_connection(conn)
-          # Fallback to JSON
+        
+        # Fallback to JSON
         users = dm.load_data('users')
         if user_id in users:
             user_data = users[user_id]
-            return User(user_id, user_data['username'], user_data['email'], user_data.get('password_hash'))
-        return None
-        
-    @staticmethod
-    def get_by_email(email):
-        # Try database first
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute('SELECT id, username, email, password_hash FROM users WHERE email = ?', (email,))
-                user = cur.fetchone()
-                cur.close()
-                
-                if user:
-                    return User(user[0], user[1], user[2], user[3])
-            except Exception as e:
-                logger.error(f"Database error in User.get_by_email: {e}")
-            finally:
-                return_db_connection(conn)
-          # Fallback to JSON
-        users = dm.load_data('users')
-        for user_id, user_data in users.items():
-            if user_data.get('email') == email:
-                return User(
-                    user_id, 
-                    user_data.get('username', email), 
-                    email, 
-                    user_data.get('password_hash')
-                )
+            u = User(user_id, user_data['username'], user_data['email'], user_data.get('password_hash'))
+            u._app_mode = user_data.get('app_mode', "DEFAULT")
+            return u
         return None
 
-    def save(self):
-        """Save user to database and JSON"""
-        # Save to database if available
+    @property
+    def app_mode(self):
+        return self._app_mode
+    
+    @app_mode.setter
+    def app_mode(self, mode):
+        # Prøv database først
         conn = get_db_connection()
         if conn:
             try:
                 cur = conn.cursor()
-                cur.execute(
-                    'INSERT INTO users (id, username, email, password_hash) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING',
-                    (self.id, self.username, self.email, self.password_hash)
-                )
+                cur.execute('UPDATE users SET app_mode = %s WHERE id = %s', (mode, self.id))
                 conn.commit()
                 cur.close()
-                logger.info(f"User {self.email} saved to database")
-                return True
+                return
             except Exception as e:
-                logger.error(f"Database error saving user: {e}")
-            finally: 
+                logger.error(f"Database error setting user mode: {e}")
+            finally:
                 return_db_connection(conn)
         
-        # Always save to JSON as backup
+        # Fallback til JSON
         users = dm.load_data('users')
-        users[self.id] = {
-            'username': self.username,
-            'email': self.email,
-            'password_hash': self.password_hash,
-            'created': datetime.now().isoformat()
-        }
-        dm.save_data('users', users)
-        logger.info(f"User {self.email} saved to JSON")
-        return True
+        if self.id in users:
+            users[self.id]['app_mode'] = mode
+            dm.save_data('users', users)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -370,85 +311,64 @@ def check_reminders_for_notifications():
             now = datetime.now()
             notification_time = now + timedelta(minutes=app.config['NOTIFICATION_ADVANCE_MINUTES'])
             
+            # Last inn data
             reminders = dm.load_data('reminders')
             shared_reminders = dm.load_data('shared_reminders')
             notifications = dm.load_data('notifications')
+            users = dm.load_data('users')
             
-            sent_notifications = {n['reminder_id'] for n in notifications}
-            all_reminders = []
-            
-            # Process reminders
-            for reminder in reminders:
-                if not reminder['completed'] and reminder['id'] not in sent_notifications:
-                    try:
-                        reminder_dt = datetime.fromisoformat(reminder['datetime'].replace(' ', 'T'))
-                        if now <= reminder_dt <= notification_time:
-                            if reminder['user_id'] and '@' in reminder['user_id']:
-                                all_reminders.append((reminder, reminder['user_id']))
-                    except (ValueError, KeyError) as e:
-                        logger.warning(f"Invalid reminder datetime: {e}")
-            
-            # Process shared reminders
-            for reminder in shared_reminders:
-                if not reminder['completed'] and reminder['id'] not in sent_notifications:
-                    try:
-                        reminder_dt = datetime.fromisoformat(reminder['datetime'].replace(' ', 'T'))
-                        if now <= reminder_dt <= notification_time:
-                            if reminder['shared_with'] and '@' in reminder['shared_with']:
-                                all_reminders.append((reminder, reminder['shared_with']))
-                    except (ValueError, KeyError) as e:
-                        logger.warning(f"Invalid shared reminder datetime: {e}")
-            
-            # Send notifications (limit to 5 per run to prevent memory issues)
             sent_count = 0
-            for reminder, recipient_email in all_reminders[:5]:
-                subject = f"🔔 Påminnelse: {reminder['title']}"
-                html_content = f"""
-                <h2>Påminnelse: {reminder['title']}</h2>
-                <p>Dette er en påminnelse om at du har en oppgave som snart forfaller.</p>
-                <div style="background: #f8f9fa; padding: 15px; border-radius: 5px;">
-                    <h3>{reminder['title']}</h3>
-                    <p><strong>Beskrivelse:</strong> {reminder.get('description', 'Ingen beskrivelse')}</p>
-                    <p><strong>Tid:</strong> {reminder['datetime']}</p>
-                    <p><strong>Prioritet:</strong> {reminder['priority']}</p>
-                </div>
-                """
-                
-                success = send_email(
-                    to=recipient_email,
-                    subject=subject,
-                    html_content=html_content
-                )
-                
-                if success:
-                    notifications.append({
-                        'reminder_id': reminder['id'],
-                        'recipient': recipient_email,
-                        'sent_at': now.isoformat(),
-                        'type': 'reminder_notification'
-                    })
-                    sent_count += 1
+            errors = 0
             
-            # Save updated notifications
-            if sent_count > 0:
-                dm.save_data('notifications', notifications)
-                logger.info(f"Sent {sent_count} reminder notifications")
+            # Sjekk personlige påminnelser
+            for reminder in reminders:
+                if not reminder.get('completed') and not reminder.get('notification_sent'):
+                    reminder_time = datetime.fromisoformat(reminder['datetime'])
+                    
+                    if now <= reminder_time <= notification_time:
+                        user = users.get(str(reminder['user_id']))
+                        if user and user.get('email'):
+                            recipient_email = user['email']
+                            subject = f"Påminnelse: {reminder['title']}"
+                            
+                            html_content = render_template(
+                                'emails/reminder_notification.html',
+                                reminder=reminder
+                            )
+                            
+                            success = send_email(
+                                to=recipient_email,
+                                subject=subject,
+                                html_content=html_content
+                            )
+                            
+                            if success:
+                                reminder['notification_sent'] = True
+                                notifications.append({
+                                    'reminder_id': reminder['id'],
+                                    'recipient': recipient_email,
+                                    'sent_at': now.isoformat(),
+                                    'type': 'reminder_notification'
+                                })
+                                sent_count += 1
+                            else:
+                                errors += 1
             
-            # Log memory usage after
-            memory_mb_after = process.memory_info().rss / 1024 / 1024
-            logger.info(f"Memory usage after reminder check: {memory_mb_after:.2f} MB")
+            # Lagre oppdaterte data
+            dm.save_data('reminders', reminders)
+            dm.save_data('notifications', notifications)
+            
+            # Log resultater
+            logger.info(f"Reminder check completed: {sent_count} notifications sent, {errors} errors")
+            memory_after = process.memory_info().rss / 1024 / 1024
+            logger.info(f"Memory usage after reminder check: {memory_after:.2f} MB (Change: {memory_after - memory_mb:.2f} MB)")
             
         except Exception as e:
-            logger.error(f"Error checking reminders: {e}")
-
-# Initialize scheduler with reduced frequency
+            logger.error(f"Error in reminder check: {e}", exc_info=True)
+            
+# Start scheduler for reminders
 scheduler = BackgroundScheduler()
-scheduler.add_job(
-    func=check_reminders_for_notifications,
-    trigger="interval",
-    minutes=15,  # Reduced from 5 to 15 minutes
-    id='check_reminders_for_notifications'
-)
+scheduler.add_job(func=check_reminders_for_notifications, trigger="interval", minutes=5)
 scheduler.start()
 
 # Helper functions
@@ -777,20 +697,26 @@ def register():
     
     if form.validate_on_submit():
         try:
+            logger.info("Starting user registration process")
+            
             # Valider e-post
             email = form.username.data.lower().strip()
             if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+                logger.warning(f"Invalid email format: {email}")
                 flash('Vennligst oppgi en gyldig e-postadresse.', 'error')
                 return render_template('register.html', form=form)
             
             # Sjekk om bruker eksisterer
-            if User.get_by_email(email):
+            existing_user = User.get_by_email(email)
+            if existing_user:
+                logger.warning(f"Registration attempted with existing email: {email}")
                 flash('Denne e-postadressen er allerede registrert. Vennligst logg inn eller bruk glemt passord.', 'error')
                 return render_template('register.html', form=form)
             
             # Valider passord
             password = form.password.data
             if len(password) < 8:
+                logger.warning("Password too short during registration")
                 flash('Passordet må være minst 8 tegn langt.', 'error')
                 return render_template('register.html', form=form)
             
@@ -798,33 +724,50 @@ def register():
             user_id = str(uuid.uuid4())
             password_hash = generate_password_hash(password)
             username = email.split('@')[0]  # Bruk delen før @ som brukernavn
-            
-            # Opprett bruker i database
+            logger.info(f"Creating new user with email: {email}")
+              # Opprett bruker i database
             user = User(user_id, username, email, password_hash)
+            
+            # Sett standardverdier
+            user.app_mode = 'light'
+            user.notification_advance = 30
+            user.email_notifications = True
+            
             if not user.save():
-                raise Exception("Could not save user to database")
-            
-            # Send velkomst-e-post
-            welcome_sent = send_email(
-                to=email,
-                subject="Velkommen til Smart Påminner Pro!",
-                template='emails/welcome.html',
-                user={'username': username}
-            )
-            
-            # Logg inn brukeren
-            login_user(user, remember=True)
-            
-            # Gi tilbakemelding
-            flash(f'Velkommen til Smart Påminner Pro, {username}! Din konto er opprettet.', 'success')
-            if not welcome_sent:
-                flash('Merk: Kunne ikke sende velkomst-e-post. Sjekk spam-mappen eller kontakt support.', 'warning')
-            
+                logger.error("Failed to save user to database")
+                flash('Beklager, kunne ikke opprette brukeren. Prøv igjen senere.', 'error')
+                return render_template('register.html', form=form)
+
             # Initialiser brukerprofil
             try:
+                init_user_profile(user)
+            except Exception as e:
+                logger.error(f"Error initializing user profile: {e}")
+                # Fortsett selv om profil-initialisering feiler
+
+            # Send velkomst-e-post
+            logger.info(f"Attempting to send welcome email to {email}")
+            try:
+                msg = Message('Velkommen til SmartReminder!',
+                            sender=app.config['MAIL_DEFAULT_SENDER'],
+                            recipients=[email])
+                msg.html = render_template('emails/welcome.html', username=username)
+                mail.send(msg)
+            except Exception as e:
+                logger.error(f"Failed to send welcome email: {e}")
+                # Fortsett selv om e-post feiler
+
+            # Logg inn brukeren automatisk
+            login_user(user)
+            flash('Registrering vellykket! Velkommen til SmartReminder!', 'success')
+            return redirect(url_for('dashboard'))
+
+            # Initialiser brukerprofil
+            try:
+                logger.info(f"Initializing user profile for {email}")
                 init_user_profile(user_id)
             except Exception as e:
-                logger.error(f"Kunne ikke opprette brukerprofil: {e}")
+                logger.error(f"Kunne ikke opprette brukerprofil for {email}: {e}")
                 flash('Merk: Noen innstillinger måtte settes til standard. Du kan endre disse senere.', 'info')
             
             return redirect(url_for('dashboard'))
@@ -1055,17 +998,42 @@ def add_note():
 def settings():
     form = SettingsForm()
     
+    if request.method == 'GET':
+        # Hent brukerens nåværende innstillinger
+        users = dm.load_data('users')
+        user = users.get(str(current_user.id))
+        
+        if user:
+            form.app_mode.data = user.get('app_mode', 'DEFAULT')
+            form.notification_time.data = str(user.get('notification_time', '30'))
+            form.email_notifications.data = user.get('email_notifications', 'all')
+    
     if form.validate_on_submit():
-        app_mode = form.app_mode.data
-        current_user.app_mode = app_mode
-        # In a real application, save this to the database
-        flash('Innstillinger oppdatert!', 'success')
-        return redirect(url_for('settings'))
-    
-    # Pre-fill the form with the current user's settings
-    form.app_mode.data = current_user.app_mode
-    
-    return render_template('settings.html', form=form)
+        try:
+            users = dm.load_data('users')
+            user = users.get(str(current_user.id))
+            
+            if user:
+                # Oppdater innstillinger
+                user['app_mode'] = form.app_mode.data
+                user['notification_time'] = int(form.notification_time.data)
+                user['email_notifications'] = form.email_notifications.data
+                
+                # Lagre endringer
+                dm.save_data('users', users)
+                
+                # Oppdater session
+                session['app_mode'] = form.app_mode.data
+                
+                flash('Innstillingene er lagret!', 'success')
+            else:
+                flash('Kunne ikke oppdatere innstillingene.', 'error')
+                
+        except Exception as e:
+            logger.error(f"Error saving settings: {e}")
+            flash('Det oppstod en feil ved lagring av innstillingene.', 'error')
+            
+    return render_template('settings.html', form=form, app_mode=session.get('app_mode', 'DEFAULT'))
 
 @app.route('/profile-setup')
 @login_required
@@ -1122,7 +1090,78 @@ def start_focus_session():
 @app.route('/focus')
 @login_required
 def focus_session():
-    return render_template('focus_session.html')  # Fixed template name
+    # Hent brukerens fokusøktinnstillinger
+    conn = get_db_connection()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("""
+                SELECT focus_settings
+                FROM user_settings
+                WHERE user_id = ?
+            """, (current_user.id,))
+            
+            settings = cur.fetchone()
+            
+            # Hvis ingen innstillinger finnes, bruk standardverdier
+            if not settings:
+                focus_settings = {
+                    'default_duration': 25,
+                    'break_duration': 5,
+                    'long_break_duration': 15,
+                    'sessions_before_long_break': 4,
+                    'notification_type': 'sound',
+                    'ambient_sound': 'none'
+                }
+            else:
+                focus_settings = settings[0]
+            
+            # Hent siste fokusøkter
+            cur.execute("""
+                SELECT session_type, duration, notes, completed_at
+                FROM focus_sessions
+                WHERE user_id = ?
+                ORDER BY started_at DESC
+                LIMIT 5
+            """, (current_user.id,))
+            
+            recent_sessions = cur.fetchall()
+            
+            # Hent aktive påminnelser for dagens dato
+            today = datetime.now().date()
+            cur.execute("""
+                SELECT id, title, description, datetime
+                FROM reminders
+                WHERE user_id = ?
+                AND DATE(datetime) = ?
+                AND completed = 0
+                ORDER BY datetime ASC
+            """, (current_user.id, today))
+            
+            todays_reminders = cur.fetchall()
+            
+            return render_template(
+                'focus_session.html',
+                settings=focus_settings,
+                recent_sessions=recent_sessions,
+                reminders=todays_reminders,
+                active_mode=session.get('app_mode', 'DEFAULT')
+            )
+            
+        except Exception as e:
+            logger.error(f"Error fetching focus settings: {e}")
+        finally:
+            cur.close()
+            conn.close()
+    
+    # Fallback hvis databasen ikke er tilgjengelig
+    return render_template(
+        'focus_session.html',
+        settings={'default_duration': 25},
+        recent_sessions=[],
+        reminders=[],
+        active_mode='DEFAULT'
+    )
     
 @app.route('/focus-session/stop/<int:session_id>', methods=['POST'])
 @login_required
@@ -1440,6 +1479,7 @@ def change_mode():
     
     return jsonify({'message': f'Mode changed to {mode}', 'mode': mode}), 200
 
+# Error handlers
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('errors/404.html'), 404
@@ -1450,55 +1490,24 @@ def forbidden(e):
 
 @app.errorhandler(500)
 def internal_server_error(e):
-    logger.error(f"500 error: {str(e)}")
     return render_template('errors/500.html'), 500
-
-# Add this after creating the app but before defining routes
-
-# Enable CORS to ensure CSRF tokens work properly
-@app.after_request
-def add_cors_headers(response):
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
-    response.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE'
-    return response
-
-
-def save_user_mode(user_id, mode):
-    """Lagre brukerens modus både i database og JSON"""
-    # Prøv database først
-    conn = get_db_connection()
-    if conn:
-        try:
-            cur = conn.cursor()
-            cur.execute(
-                'UPDATE users SET app_mode = %s WHERE id = %s',
-                (mode, user_id)
-            )
-            conn.commit()
-            cur.close()
-        except Exception as e:
-            logger.error(f"Database error saving user mode: {e}")
-        finally:
-            return_db_connection(conn)
-    
-    # Alltid oppdater JSON som backup
-    users = dm.load_data('users')
-    if user_id in users:
-        users[user_id]['app_mode'] = mode
-        dm.save_data('users', users)
-        return True
-    return False
 
 @app.route('/set_mode', methods=['POST'])
 @login_required
 def set_mode():
+    """Set the application mode for the current user"""
     mode = request.form.get('app_mode', 'DEFAULT')
-    if mode in ['DEFAULT', 'ADHD_FRIENDLY', 'SILENT', 'FOCUS', 'DARK']:
-        if save_user_mode(current_user.id, mode):
-            flash('Modus oppdatert!', 'success')
-        else:
-            flash('Kunne ikke oppdatere modus', 'error')
+    if mode not in ['DEFAULT', 'ADHD_FRIENDLY', 'SILENT', 'FOCUS', 'DARK']:
+        flash('Ugyldig modus valgt', 'error')
+        return redirect(url_for('settings'))
+    
+    try:
+        current_user.app_mode = mode
+        flash('Modus endret til: ' + mode, 'success')
+    except Exception as e:
+        logger.error(f"Error setting mode: {e}")
+        flash('Kunne ikke endre modus', 'error')
+    
     return redirect(request.referrer or url_for('dashboard'))
 
 # Oppdater User-klassen
@@ -1508,7 +1517,7 @@ class User(UserMixin):
         self.username = username
         self.email = email
         self.password_hash = password_hash
-        self.app_mode = "DEFAULT"
+        self._app_mode = "DEFAULT"  # Changed to protected attribute
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -1520,104 +1529,82 @@ class User(UserMixin):
         if conn:
             try:
                 cur = conn.cursor()
-                cur.execute('SELECT id, username, email, password_hash FROM users WHERE id = ?', (user_id,))
+                cur.execute('SELECT id, username, email, password_hash, app_mode FROM users WHERE id = ?', (user_id,))
                 user = cur.fetchone()
                 cur.close()
                 
                 if user:
-                    return User(user[0], user[1], user[2], user[3])
+                    u = User(user[0], user[1], user[2], user[3])
+                    u._app_mode = user[4] if user[4] else "DEFAULT"
+                    return u
             except Exception as e:
                 logger.error(f"Database error in User.get: {e}")
             finally:
                 return_db_connection(conn)
-          # Fallback to JSON
+        
+        # Fallback to JSON
         users = dm.load_data('users')
         if user_id in users:
             user_data = users[user_id]
-            return User(user_id, user_data['username'], user_data['email'], user_data.get('password_hash'))
+            u = User(user_id, user_data['username'], user_data['email'], user_data.get('password_hash'))
+            u._app_mode = user_data.get('app_mode', "DEFAULT")
+            return u
         return None
-        
-    @staticmethod
-    def get_by_email(email):
-        # Try database first
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute('SELECT id, username, email, password_hash FROM users WHERE email = ?', (email,))
-                user = cur.fetchone()
-                cur.close()
-                
-                if user:
-                    return User(user[0], user[1], user[2], user[3])
-            except Exception as e:
-                logger.error(f"Database error in User.get_by_email: {e}")
-            finally:
-                return_db_connection(conn)
-          # Fallback to JSON
-        users = dm.load_data('users')
-        for user_id, user_data in users.items():
-            if user_data.get('email') == email:
-                return User(
-                    user_id, 
-                    user_data.get('username', email), 
-                    email, 
-                    user_data.get('password_hash')
-                )
-        return None
-
-    def save(self):
-        """Save user to database and JSON"""
-        # Save to database if available
-        conn = get_db_connection()
-        if conn:
-            try:
-                cur = conn.cursor()
-                cur.execute(
-                    'INSERT INTO users (id, username, email, password_hash) VALUES (?, ?, ?, ?) ON CONFLICT (email) DO NOTHING',
-                    (self.id, self.username, self.email, self.password_hash)
-                )
-                conn.commit()
-                cur.close()
-                logger.info(f"User {self.email} saved to database")
-                return True
-            except Exception as e:
-                logger.error(f"Database error saving user: {e}")
-            finally: 
-                return_db_connection(conn)
-        
-        # Always save to JSON as backup
-        users = dm.load_data('users')
-        users[self.id] = {
-            'username': self.username,
-            'email': self.email,
-            'password_hash': self.password_hash,
-            'created': datetime.now().isoformat()
-        }
-        dm.save_data('users', users)
-        logger.info(f"User {self.email} saved to JSON")
-        return True
 
     @property
     def app_mode(self):
-        # Sjekk database først
+        return self._app_mode
+    
+    @app_mode.setter
+    def app_mode(self, mode):
+        # Prøv database først
         conn = get_db_connection()
         if conn:
             try:
                 cur = conn.cursor()
-                cur.execute('SELECT app_mode FROM users WHERE id = %s', (self.id,))
-                mode = cur.fetchone()
+                cur.execute('UPDATE users SET app_mode = %s WHERE id = %s', (mode, self.id))
+                conn.commit()
                 cur.close()
-                if mode:
-                    return mode[0]
+                return
             except Exception as e:
-                logger.error(f"Database error getting user mode: {e}")
+                logger.error(f"Database error setting user mode: {e}")
             finally:
                 return_db_connection(conn)
         
         # Fallback til JSON
         users = dm.load_data('users')
-        return users.get(self.id, {}).get('app_mode', 'DEFAULT')
+        if self.id in users:
+            users[self.id]['app_mode'] = mode
+            dm.save_data('users', users)
+
+# App mode route
+@app.route('/change_app_mode', methods=['POST'])
+@login_required
+def change_app_mode():
+    try:
+        new_mode = request.form.get('app_mode')
+        if new_mode in ['DEFAULT', 'ADHD_FRIENDLY', 'SILENT', 'FOCUS', 'DARK']:
+            # Last inn brukerdata
+            users = dm.load_data('users')
+            user = users.get(str(current_user.id))
+            
+            if user:
+                user['app_mode'] = new_mode
+                dm.save_data('users', users)
+                flash('Appmodus er oppdatert!', 'success')
+                
+                # Lagre i session for rask tilgang
+                session['app_mode'] = new_mode
+            else:
+                flash('Kunne ikke oppdatere appmodus.', 'error')
+        else:
+            flash('Ugyldig appmodus valgt.', 'error')
+            
+    except Exception as e:
+        logger.error(f"Error changing app mode: {e}")
+        flash('Det oppstod en feil ved endring av appmodus.', 'error')
+        
+    return redirect(request.referrer or url_for('settings'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

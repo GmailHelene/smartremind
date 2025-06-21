@@ -1,0 +1,32 @@
+{
+    "title": "Prosjektplanlegging",
+    "description": "Mal for effektiv prosjektplanlegging og oppfølging",
+    "sections": [
+        {
+            "title": "Planlegging",
+            "type": "kanban",
+            "columns": ["Backlog", "Denne uka", "I arbeid", "Ferdig"]
+        },
+        {
+            "title": "Ressurser",
+            "type": "files",
+            "allowedTypes": ["pdf", "doc", "docx", "xls", "xlsx", "jpg", "png"]
+        },
+        {
+            "title": "Møter",
+            "type": "meetings",
+            "features": ["scheduling", "notes", "action_items"]
+        },
+        {
+            "title": "Milepæler",
+            "type": "milestones",
+            "integration": "reminders"
+        }
+    ],
+    "features": [
+        "gantt",
+        "resource_allocation",
+        "time_tracking",
+        "reminders"
+    ]
+}

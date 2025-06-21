@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+
+{% block title %}Felles Arbeidsområde - Smart Påminner Pro{% endblock %}
+
+{% block content %}
+<div class="workboard-container">
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="mb-0">
+                    <i class="fas fa-chalkboard"></i> Felles Arbeidsområde
+                </h1>
+                <div>
+                    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createBoardModal">
+                        <i class="fas fa-plus-circle"></i> Nytt Arbeidsområde
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        {% if boards %}
+            {% for board in boards %}
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-header bg-gradient-primary text-white">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">{{ board.title }}</h5>
+                            <span class="badge bg-light text-dark">
+                                <i class="fas fa-users"></i> {{ board.members|length }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-2">
+                            <i class="fas fa-tag"></i> {{ board.category }}
+                        </p>
+                        <p class="card-text">{{ board.description|truncate(100) }}</p>
+                        
+                        <div class="board-preview">
+                            <div class="idea-chips">
+                                {% for idea in board.ideas[:3] %}
+                                <span class="badge rounded-pill bg-light text-dark mb-1">
+                                    {{ idea.text|truncate(20) }}
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-light">
+                        <div class="d-grid">
+                            <a href="{{ url_for('view_board', board_id=board.id) }}" class="btn btn-primary">
+                                <i class="fas fa-pencil-alt"></i> Åpne arbeidsområde
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Ingen aktive arbeidsområder. Opprett et nytt for å komme i gang!
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal for å opprette nytt arbeidsområde -->
+<div class="modal fade" id="createBoardModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">Opprett nytt arbeidsområde</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('create_board') }}" id="createBoardForm">
+                    {{ form.csrf_token }}
+                    <div class="mb-3">
+                        <label class="form-label">Tittel</label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Beskrivelse</label>
+                        <textarea class="form-control" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Kategori</label>
+                        <select class="form-select" name="category">
+                            <option value="prosjekt">Prosjekt</option>
+                            <option value="idémyldring">Idémyldring</option>
+                            <option value="planlegging">Planlegging</option>
+                            <option value="annet">Annet</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+                <button type="submit" form="createBoardForm" class="btn btn-primary">Opprett</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Template-velger -->
+<div class="modal fade" id="templateModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Velg mal for arbeidsområdet</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <div class="template-card" data-template="brainstorm">
+                            <div class="template-icon">
+                                <i class="fas fa-lightbulb"></i>
+                            </div>
+                            <h5>Idémyldring</h5>
+                            <p>Perfekt for kreativ utforskning og idéutvikling</p>
+                            <ul class="template-features">
+                                <li><i class="fas fa-vote-yea"></i> Avstemning</li>
+                                <li><i class="fas fa-list"></i> Kategorisering</li>
+                                <li><i class="fas fa-clock"></i> Tidsur</li>
+                                <li><i class="fas fa-user-secret"></i> Anonym modus</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <div class="template-card" data-template="project">
+                            <div class="template-icon">
+                                <i class="fas fa-tasks"></i>
+                            </div>
+                            <h5>Prosjektplanlegging</h5>
+                            <p>Strukturert oppsett for prosjektstyring</p>
+                            <ul class="template-features">
+                                <li><i class="fas fa-columns"></i> Kanban-tavle</li>
+                                <li><i class="fas fa-chart-gantt"></i> Gantt-diagram</li>
+                                <li><i class="fas fa-file"></i> Fildeling</li>
+                                <li><i class="fas fa-calendar"></i> Møteplanlegging</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+                <button type="button" class="btn btn-primary" onclick="useTemplate()">Bruk valgt mal</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+.workboard-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.board-preview {
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #eee;
+}
+
+.idea-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.bg-gradient-primary {
+    background: linear-gradient(135deg, var(--bs-primary) 0%, #2E86AB 100%);
+}
+
+.template-card {
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 1.5rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.template-card:hover, .template-card.selected {
+    border-color: var(--bs-primary);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+.template-icon {
+    font-size: 2.5rem;
+    color: var(--bs-primary);
+    margin-bottom: 1rem;
+}
+
+.template-features {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0 0;
+}
+
+.template-features li {
+    margin: 0.5rem 0;
+    color: #666;
+}
+
+.template-features i {
+    width: 20px;
+    color: var(--bs-primary);
+}
+</style>
+{% endblock %}
+
+<script>
+let selectedTemplate = null;
+
+document.querySelectorAll('.template-card').forEach(card => {
+    card.addEventListener('click', function() {
+        document.querySelectorAll('.template-card').forEach(c => c.classList.remove('selected'));
+        this.classList.add('selected');
+        selectedTemplate = this.dataset.template;
+    });
+});
+
+function useTemplate() {
+    if (!selectedTemplate) {
+        alert('Vennligst velg en mal først');
+        return;
+    }
+
+    fetch('/api/board/template', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            template: selectedTemplate
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = `/board/${data.board_id}`;
+        }
+    });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}{{ board.title }} - Arbeidsområde{% endblock %}
+
+{% block content %}
+<div class="board-container">
+    <div class="board-header mb-4">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h1 class="mb-0">{{ board.title }}</h1>
+                <p class="text-muted mb-0">
+                    <i class="fas fa-tag"></i> {{ board.category }} |
+                    <i class="fas fa-users"></i> {{ board.members|length }} deltakere |
+                    <i class="fas fa-clock"></i> Opprettet {{ board.created_at|as_datetime }}
+                </p>
+            </div>
+            <div class="board-actions">
+                <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#inviteModal">
+                    <i class="fas fa-user-plus"></i> Inviter
+                </button>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addIdeaModal">
+                    <i class="fas fa-lightbulb"></i> Ny idé
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="board-content">
+        <div class="row">
+            <!-- Idéliste -->
+            <div class="col-md-8">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-lightbulb"></i> Ideer og notater</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="ideas-list">
+                            {% for idea in board.ideas %}
+                            <div class="idea-card mb-3" data-idea-id="{{ idea.id }}">
+                                <div class="idea-header d-flex justify-content-between align-items-start">
+                                    <h6 class="mb-1">{{ idea.title }}</h6>
+                                    <div class="idea-actions">
+                                        <button class="btn btn-sm btn-link text-primary" onclick="likeIdea('{{ idea.id }}')">
+                                            <i class="fas fa-thumbs-up"></i> {{ idea.likes|length }}
+                                        </button>
+                                        {% if idea.user_id == current_user.id %}
+                                        <button class="btn btn-sm btn-link text-danger" onclick="deleteIdea('{{ idea.id }}')">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <p class="mb-2">{{ idea.text }}</p>
+                                <div class="idea-footer text-muted">
+                                    <small>
+                                        <i class="fas fa-user"></i> {{ idea.username }} |
+                                        <i class="fas fa-clock"></i> {{ idea.created_at|as_datetime }}
+                                    </small>
+                                </div>
+                                <!-- Kommentarseksjon -->
+                                <div class="idea-comments mt-2">
+                                    {% for comment in idea.comments %}
+                                    <div class="comment">
+                                        <small>
+                                            <strong>{{ comment.username }}:</strong>
+                                            {{ comment.text }}
+                                        </small>
+                                    </div>
+                                    {% endfor %}
+                                    <div class="add-comment mt-2">
+                                        <div class="input-group input-group-sm">
+                                            <input type="text" class="form-control" placeholder="Skriv en kommentar...">
+                                            <button class="btn btn-outline-primary" type="button" onclick="addComment('{{ idea.id }}', this)">
+                                                <i class="fas fa-paper-plane"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Deltakerliste og aktivitet -->
+            <div class="col-md-4">
+                <div class="card border-0 shadow-sm mb-4">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-users"></i> Deltakere</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="members-list">
+                            {% for member in board.members %}
+                            <div class="member-item d-flex align-items-center mb-2">
+                                <div class="member-avatar">
+                                    <i class="fas fa-user-circle fa-2x text-primary"></i>
+                                </div>
+                                <div class="member-info ms-2">
+                                    <p class="mb-0">{{ member.username }}</p>
+                                    <small class="text-muted">{{ member.role }}</small>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0"><i class="fas fa-history"></i> Aktivitet</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="activity-list">
+                            {% for activity in board.activities %}
+                            <div class="activity-item mb-2">
+                                <small>
+                                    <i class="fas {{ activity.icon }}"></i>
+                                    {{ activity.text }}
+                                    <br>
+                                    <span class="text-muted">{{ activity.timestamp|as_datetime }}</span>
+                                </small>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for ny idé -->
+<div class="modal fade" id="addIdeaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Legg til ny idé</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addIdeaForm">
+                    <div class="mb-3">
+                        <label class="form-label">Tittel</label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Beskrivelse</label>
+                        <textarea class="form-control" name="text" rows="3" required></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+                <button type="button" class="btn btn-primary" onclick="submitIdea()">Lagre</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+.board-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+.idea-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    border: 1px solid #eee;
+}
+
+.idea-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.idea-comments {
+    padding-top: 0.5rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid #eee;
+}
+
+.comment {
+    padding: 0.25rem 0;
+}
+
+.member-avatar {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8f9fa;
+    border-radius: 50%;
+}
+
+.activity-item {
+    padding-left: 1.5rem;
+    position: relative;
+}
+
+.activity-item i {
+    position: absolute;
+    left: 0;
+    top: 4px;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// WebSocket-tilkobling for sanntidsoppdateringer
+let socket;
+try {
+    socket = new WebSocket(`ws://${window.location.host}/ws/board/{{ board.id }}`);
+    
+    socket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        handleRealtimeUpdate(data);
+    };
+} catch (error) {
+    console.error('WebSocket connection failed:', error);
+}
+
+function handleRealtimeUpdate(data) {
+    switch (data.type) {
+        case 'new_idea':
+            addIdeaToBoard(data.idea);
+            break;
+        case 'new_comment':
+            addCommentToIdea(data.ideaId, data.comment);
+            break;
+        case 'like_update':
+            updateIdeaLikes(data.ideaId, data.likes);
+            break;
+    }
+}
+
+function submitIdea() {
+    const form = document.getElementById('addIdeaForm');
+    const data = {
+        title: form.title.value,
+        text: form.text.value,
+        board_id: '{{ board.id }}'
+    };
+    
+    fetch('/api/board/idea', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            $('#addIdeaModal').modal('hide');
+            form.reset();
+        }
+    });
+}
+
+function addComment(ideaId, button) {
+    const input = button.previousElementSibling;
+    const text = input.value.trim();
+    
+    if (!text) return;
+    
+    fetch('/api/board/comment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token() }}'
+        },
+        body: JSON.stringify({
+            idea_id: ideaId,
+            text: text
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            input.value = '';
+        }
+    });
+}
+
+function likeIdea(ideaId) {
+    fetch(`/api/board/idea/${ideaId}/like`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token() }}'
+        }
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}
