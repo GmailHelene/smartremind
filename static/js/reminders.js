@@ -94,11 +94,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Render reminders to a container
     function renderReminders(reminders, container, emptyMessage, isShared = false) {
-        // Clear container (except loading and empty message elements)
-        const elements = container.querySelectorAll('.reminder-item');
-        elements.forEach(el => el.remove());
+        container.innerHTML = '';
         
-        if (reminders.length === 0) {
+        if (!reminders || reminders.length === 0) {
             emptyMessage.classList.remove('d-none');
             return;
         }
@@ -172,6 +170,21 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             
             container.appendChild(reminderEl);
+        });
+        
+        // Add event listeners for edit and delete buttons
+        container.querySelectorAll('.edit-reminder').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const reminderId = e.currentTarget.dataset.id;
+                editReminder(reminderId);
+            });
+        });
+        
+        container.querySelectorAll('.delete-reminder').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const reminderId = e.currentTarget.dataset.id;
+                deleteReminder(reminderId);
+            });
         });
     }
     
