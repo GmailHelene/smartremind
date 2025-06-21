@@ -55,10 +55,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // Reload reminders
                 loadReminders();
-            })
-            .catch(error => {
-                console.error('Error adding reminder:', error);
-                alert('Failed to add reminder. Please try again.');
+            })            .catch(error => {
+                console.error('Feil ved opprettelse av påminnelse:', error);
+                alert('Kunne ikke opprette påminnelse. Vennligst prøv igjen.');
             });
         });
     }
@@ -129,23 +128,21 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Format shared info text
             let sharedInfo = '';
-            if (isShared) {
-                sharedInfo = `<div class="text-muted small mt-2">Shared by: ${reminder.owner_email}</div>`;
+            if (isShared) {                sharedInfo = `<div class="text-muted small mt-2">Delt av: ${reminder.owner_email}</div>`;
             } else if (reminder.shared_with.length > 0) {
-                sharedInfo = `<div class="text-muted small mt-2">Shared with: ${reminder.shared_with.join(', ')}</div>`;
+                sharedInfo = `<div class="text-muted small mt-2">Delt med: ${reminder.shared_with.join(', ')}</div>`;
             }
             
             // Format date and determine status text
             const formattedDate = window.appUtils.formatDate(reminder.date);
             let statusClass = '';
             let statusText = '';
-            
-            if (window.appUtils.isOverdue(reminder.date)) {
+              if (window.appUtils.isOverdue(reminder.date)) {
                 statusClass = 'text-danger';
-                statusText = 'Overdue';
+                statusText = 'Forfalt';
             } else if (window.appUtils.isDueSoon(reminder.date)) {
                 statusClass = 'text-warning';
-                statusText = 'Due soon';
+                statusText = 'Snart forfalt';
             }
             
             // Create card content
@@ -154,11 +151,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="d-flex justify-content-between align-items-start">
                         <h5 class="card-title">${reminder.title}</h5>
                         <span class="badge bg-primary rounded-pill">${statusText}</span>
-                    </div>
-                    <p class="card-text">${reminder.description || 'No description'}</p>
+                    </div>                    <p class="card-text">${reminder.description || 'Ingen beskrivelse'}</p>
                     <div class="d-flex justify-content-between">
-                        <div class="${statusClass}">Due: ${formattedDate}</div>
-                        ${!isShared ? `<button class="btn btn-sm btn-outline-danger delete-reminder" data-id="${reminder.id}">Delete</button>` : ''}
+                        <div class="${statusClass}">Forfaller: ${formattedDate}</div>
+                        ${!isShared ? `<button class="btn btn-sm btn-outline-danger delete-reminder" data-id="${reminder.id}">Slett</button>` : ''}
                     </div>
                     ${sharedInfo}
                 </div>
@@ -169,8 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (deleteBtn) {
                 deleteBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    const id = this.getAttribute('data-id');
-                    if (confirm('Are you sure you want to delete this reminder?')) {
+                    const id = this.getAttribute('data-id');                    if (confirm('Er du sikker på at du vil slette denne påminnelsen?')) {
                         deleteReminder(id);
                     }
                 });

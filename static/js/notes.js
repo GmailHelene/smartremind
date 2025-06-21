@@ -25,9 +25,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const title = document.getElementById('note-title').value.trim();
             const content = document.getElementById('note-content').value.trim();
             const shareWith = document.getElementById('note-share').value.trim();
-            
-            if (!title || !content) {
-                alert('Title and content are required!');
+              if (!title || !content) {
+                alert('Tittel og innhold er påkrevd!');
                 return;
             }
             
@@ -55,9 +54,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Reload notes
                 loadNotes();
             })
-            .catch(error => {
-                console.error('Error adding note:', error);
-                alert('Failed to add note. Please try again.');
+            .catch(error => {                console.error('Feil ved opprettelse av notat:', error);
+                alert('Kunne ikke opprette notat. Vennligst prøv igjen.');
             });
         });
     }
@@ -119,8 +117,7 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Create card HTML
         col.innerHTML = `
-            <div class="card note-card h-100 ${sharedClass}" data-id="${note.id}">
-                ${isShared ? '<span class="shared-badge">Shared</span>' : ''}
+            <div class="card note-card h-100 ${sharedClass}" data-id="${note.id}">                ${isShared ? '<span class="shared-badge">Delt</span>' : ''}
                 <div class="card-body">
                     <h5 class="card-title">${note.title}</h5>
                     <p class="card-text">${note.content.replace(/\n/g, '<br>')}</p>
@@ -128,11 +125,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="card-footer text-muted">
                     <div class="d-flex justify-content-between align-items-center">
                         <div>
-                            <small>By: ${note.creator_email || 'You'}</small><br>
+                            <small>Av: ${note.creator_email || 'Deg'}</small><br>
                             <small>${formattedDate}</small>
                         </div>
                         ${isOwn && isShared ? 
-                            `<small>Shared with ${note.shared_with.length} ${note.shared_with.length === 1 ? 'person' : 'people'}</small>` : 
+                            `<small>Delt med ${note.shared_with.length} ${note.shared_with.length === 1 ? 'person' : 'personer'}</small>` : 
                             ''}
                     </div>
                 </div>

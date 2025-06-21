@@ -265,136 +265,140 @@
     <!-- Tabs and Modals (JS-driven) -->
     <ul class="nav nav-tabs mb-4" id="myTab" role="tablist">
         <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="reminders-tab" data-bs-toggle="tab" data-bs-target="#reminders" type="button" role="tab">Reminders</button>
+            <button class="nav-link active" id="reminders-tab" data-bs-toggle="tab" data-bs-target="#reminders" type="button" role="tab">
+                <i class="fas fa-bell"></i> Påminnelser
+            </button>
         </li>
         <li class="nav-item" role="presentation">
-            <button class="nav-link" id="noteboard-tab" data-bs-toggle="tab" data-bs-target="#noteboard" type="button" role="tab">Noteboard</button>
+            <button class="nav-link" id="noteboard-tab" data-bs-toggle="tab" data-bs-target="#noteboard" type="button" role="tab">
+                <i class="fas fa-clipboard"></i> Notatbord
+            </button>
         </li>
     </ul>
 
     <div class="tab-content" id="myTabContent">
-        <!-- Reminders Tab -->
+        <!-- Påminnelser fane -->
         <div class="tab-pane fade show active" id="reminders" role="tabpanel">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2>Your Reminders</h2>
+                <h2>Dine påminnelser</h2>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addReminderModal">
-                    <i class="bi bi-plus"></i> Add Reminder
+                    <i class="fas fa-plus"></i> Legg til påminnelse
                 </button>
             </div>
             
             <div class="row">
                 <div class="col-md-12">
                     <div id="reminders-list" class="list-group mb-4">
-                        <!-- Reminders will be loaded here -->
+                        <!-- Påminnelser vil lastes her -->
                         <div class="text-center py-5" id="reminders-loading">
                             <div class="spinner-border" role="status">
-                                <span class="visually-hidden">Loading...</span>
+                                <span class="visually-hidden">Laster...</span>
                             </div>
                         </div>
                         <div class="text-center py-5 d-none" id="no-reminders">
-                            <p class="lead">No reminders found. Add your first reminder!</p>
+                            <p class="lead">Ingen påminnelser funnet. Legg til din første påminnelse!</p>
                         </div>
                     </div>
                 </div>
                 
                 <div class="col-md-12">
-                    <h3>Reminders Shared With You</h3>
+                    <h3>Påminnelser delt med deg</h3>
                     <div id="shared-reminders-list" class="list-group">
-                        <!-- Shared reminders will be loaded here -->
+                        <!-- Delte påminnelser vil lastes her -->
                         <div class="text-center py-5 d-none" id="no-shared-reminders">
-                            <p class="lead">No shared reminders found.</p>
+                            <p class="lead">Ingen delte påminnelser funnet.</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
         
-        <!-- Noteboard Tab -->
+        <!-- Notatbord fane -->
         <div class="tab-pane fade" id="noteboard" role="tabpanel">
             <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2>Shared Noteboard</h2>
+                <h2>Delt notatbord</h2>
                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addNoteModal">
-                    <i class="bi bi-plus"></i> Add Note
+                    <i class="fas fa-plus"></i> Legg til notat
                 </button>
             </div>
             
             <div id="notes-list" class="row">
-                <!-- Notes will be loaded here -->
+                <!-- Notater vil lastes her -->
                 <div class="text-center py-5" id="notes-loading">
                     <div class="spinner-border" role="status">
-                        <span class="visually-hidden">Loading...</span>
+                        <span class="visually-hidden">Laster...</span>
                     </div>
                 </div>
                 <div class="text-center py-5 d-none" id="no-notes">
-                    <p class="lead">No notes found. Add your first note to the shared board!</p>
+                    <p class="lead">Ingen notater funnet. Legg til ditt første notat på tavlen!</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Add Reminder Modal -->
+    <!-- Legg til påminnelse modal -->
     <div class="modal fade" id="addReminderModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add New Reminder</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title">Legg til ny påminnelse</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
                 </div>
                 <div class="modal-body">
                     <form id="add-reminder-form">
                         <div class="mb-3">
-                            <label for="reminder-title" class="form-label">Title</label>
+                            <label for="reminder-title" class="form-label">Tittel</label>
                             <input type="text" class="form-control" id="reminder-title" required>
                         </div>
                         <div class="mb-3">
-                            <label for="reminder-description" class="form-label">Description</label>
+                            <label for="reminder-description" class="form-label">Beskrivelse</label>
                             <textarea class="form-control" id="reminder-description" rows="3"></textarea>
                         </div>
                         <div class="mb-3">
-                            <label for="reminder-date" class="form-label">Date</label>
+                            <label for="reminder-date" class="form-label">Dato</label>
                             <input type="datetime-local" class="form-control" id="reminder-date" required>
                         </div>
                         <div class="mb-3">
-                            <label for="reminder-share" class="form-label">Share with (comma separated emails)</label>
-                            <input type="text" class="form-control" id="reminder-share">
+                            <label for="reminder-share" class="form-label">Del med (kommaseparerte e-poster)</label>
+                            <input type="text" class="form-control" id="reminder-share" placeholder="eks: bruker1@mail.com, bruker2@mail.com">
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="save-reminder">Save Reminder</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+                    <button type="button" class="btn btn-primary" id="save-reminder">Lagre påminnelse</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Add Note Modal -->
+    <!-- Legg til notat modal -->
     <div class="modal fade" id="addNoteModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Add New Note</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title">Legg til nytt notat</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Lukk"></button>
                 </div>
                 <div class="modal-body">
                     <form id="add-note-form">
                         <div class="mb-3">
-                            <label for="note-title" class="form-label">Title</label>
+                            <label for="note-title" class="form-label">Tittel</label>
                             <input type="text" class="form-control" id="note-title" required>
                         </div>
                         <div class="mb-3">
-                            <label for="note-content" class="form-label">Content</label>
+                            <label for="note-content" class="form-label">Innhold</label>
                             <textarea class="form-control" id="note-content" rows="5" required></textarea>
                         </div>
                         <div class="mb-3">
-                            <label for="note-share" class="form-label">Share with (comma separated emails)</label>
-                            <input type="text" class="form-control" id="note-share">
+                            <label for="note-share" class="form-label">Del med (kommaseparerte e-poster)</label>
+                            <input type="text" class="form-control" id="note-share" placeholder="eks: bruker1@mail.com, bruker2@mail.com">
                         </div>
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="save-note">Save Note</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Avbryt</button>
+                    <button type="button" class="btn btn-primary" id="save-note">Lagre notat</button>
                 </div>
             </div>
         </div>
