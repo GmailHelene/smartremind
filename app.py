@@ -107,58 +107,96 @@ def init_db():
         if conn:
             cur = conn.cursor()
             
-            # Create users table if it doesn't exist
-            cur.execute('''
+            # Create users table
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id TEXT PRIMARY KEY,
                     username TEXT NOT NULL,
                     email TEXT UNIQUE NOT NULL,
                     password_hash TEXT NOT NULL,
                     app_mode TEXT DEFAULT 'DEFAULT',
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    notification_time INTEGER DEFAULT 30,
+                    email_notifications TEXT DEFAULT 'all'
                 )
-            ''')
+            """)
             
-            # Create reminders table if it doesn't exist
-            cur.execute('''
+            # Create reminders table with datetime column
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS reminders (
                     id TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL,
                     title TEXT NOT NULL,
                     description TEXT,
-                    due_date TIMESTAMP NOT NULL,
+                    datetime TEXT NOT NULL,
                     category TEXT,
                     priority TEXT,
-                    completed BOOLEAN DEFAULT 0,
-                    notification_sent BOOLEAN DEFAULT 0,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed BOOLEAN DEFAULT FALSE,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    completed_at TEXT,
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 )
-            ''')
+            """)
             
-            # Create shared_reminders table if it doesn't exist
-            cur.execute('''
-                CREATE TABLE IF NOT EXISTS shared_reminders (
-                    id TEXT PRIMARY KEY,
-                    reminder_id TEXT NOT NULL,
-                    shared_by TEXT NOT NULL,
-                    shared_with TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (reminder_id) REFERENCES reminders(id),
-                    FOREIGN KEY (shared_by) REFERENCES users(id),
-                    FOREIGN KEY (shared_with) REFERENCES users(id)
+            # Create user_profiles table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_profiles (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT UNIQUE NOT NULL,
+                    profile_type TEXT DEFAULT 'standard',
+                    preferences TEXT,
+                    accessibility_settings TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
                 )
-            ''')
+            """)
+            
+            # Create focus_sessions table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS focus_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    session_type TEXT NOT NULL,
+                    duration_minutes INTEGER NOT NULL,
+                    started_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    notes TEXT,
+                    completed BOOLEAN DEFAULT FALSE,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+            
+            # Create user_settings table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_settings (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT UNIQUE NOT NULL,
+                    focus_settings TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            """)
+            
+            # Create user_statistics table
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS user_statistics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id TEXT NOT NULL,
+                    date TEXT NOT NULL,
+                    points INTEGER DEFAULT 0,
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    UNIQUE(user_id, date)
+                )
+            """)
             
             conn.commit()
             cur.close()
             logger.info("Database tables initialized successfully!")
             return True
+            
     except Exception as e:
         logger.error(f"Database initialization error: {e}")
         return False
+        
     finally:
-        if conn:
+        if 'conn' in locals():
             return_db_connection(conn)
 
 # Initialize database on startup
@@ -341,136 +379,89 @@ def check_reminders_for_notifications():
     """Check reminders and send notifications with memory logging"""
     with app.app_context():
         try:
-            # Log memory usage
+            # Logg minnebruk før sjekk
             process = psutil.Process()
-            memory_mb = process.memory_info().rss / 1024 / 1024
-            logger.info(f"Minnebruk før påminnelsessjekk: {memory_mb:.2f} MB")
+            memory_before = process.memory_info().rss / 1024 / 1024
+            logger.info(f"Minnebruk før påminnelsessjekk: {memory_before:.2f} MB")
             
-            now = datetime.now()
-            notification_time = now + timedelta(minutes=app.config['NOTIFICATION_ADVANCE_MINUTES'])
-            
-            # Connect to database
+            # Hent påminnelser fra database
             conn = get_db_connection()
             if conn:
                 try:
                     cur = conn.cursor()
-                    # Query reminders that need notifications
                     cur.execute("""
-                        SELECT r.id, r.title, r.description, r.due_date, r.category, r.priority,
-                               u.email, u.username
+                        SELECT r.id, r.title, r.description, r.datetime, r.user_id, 
+                               u.email, u.notification_time
                         FROM reminders r
                         JOIN users u ON r.user_id = u.id
-                        WHERE r.completed = 0 
-                        AND r.notification_sent = 0
-                        AND r.due_date <= ?
-                        AND r.due_date >= ?
-                    """, (notification_time.isoformat(), now.isoformat()))
+                        WHERE r.completed = FALSE 
+                        AND datetime(r.datetime) > datetime('now')
+                        AND datetime(r.datetime) <= datetime('now', '+1 hour')
+                    """)
                     
-                    reminders_to_notify = cur.fetchall()
-                    
-                    sent_count = 0
-                    errors = 0
-                    
-                    for reminder in reminders_to_notify:
-                        recipient_email = reminder[6]  # email from join
-                        subject = f"Påminnelse: {reminder[1]}"  # title
-                        
-                        html_content = render_template(
-                            'emails/reminder_notification.html',
-                            reminder={
-                                'id': reminder[0],
-                                'title': reminder[1],
-                                'description': reminder[2],
-                                'datetime': reminder[3],
-                                'category': reminder[4],
-                                'priority': reminder[5]
-                            }
-                        )
-                        
-                        success = send_email(
-                            to=recipient_email,
-                            subject=subject,
-                            html_content=html_content
-                        )
-                        
-                        if success:
-                            # Mark notification as sent
-                            cur.execute("""
-                                UPDATE reminders 
-                                SET notification_sent = 1 
-                                WHERE id = ?
-                            """, (reminder[0],))
-                            conn.commit()
-                            sent_count += 1
-                        else:
-                            errors += 1
-                    
-                    # Log results
-                    logger.info(f"Påminnelsessjekk fullført: {sent_count} varsler sendt, {errors} feil")
-                    
-                except sqlite3.Error as e:
-                    logger.error(f"Database error i påminnelsessjekk: {str(e)}")
-                    
-                finally:
+                    all_reminders = cur.fetchall()
                     cur.close()
-                    conn.close()
-            else:
-                # Fallback to JSON if database connection fails
-                try:
-                    reminders = dm.load_data('reminders')
-                    users = dm.load_data('users')
-                    notifications = dm.load_data('notifications')
-                    
-                    sent_count = 0
-                    errors = 0
-                    
-                    for reminder in reminders:
-                        if not reminder.get('completed') and not reminder.get('notification_sent'):
-                            reminder_time = datetime.fromisoformat(reminder['datetime'])
-                            
-                            if now <= reminder_time <= notification_time:
-                                user = next((u for u in users if u['id'] == reminder['user_id']), None)
-                                if user and user.get('email'):
-                                    recipient_email = user['email']
-                                    subject = f"Påminnelse: {reminder['title']}"
-                                    
-                                    html_content = render_template(
-                                        'emails/reminder_notification.html',
-                                        reminder=reminder
-                                    )
-                                    
-                                    success = send_email(
-                                        to=recipient_email,
-                                        subject=subject,
-                                        html_content=html_content
-                                    )
-                                    
-                                    if success:
-                                        reminder['notification_sent'] = True
-                                        notifications.append({
-                                            'reminder_id': reminder['id'],
-                                            'recipient': recipient_email,
-                                            'sent_at': now.isoformat(),
-                                            'type': 'reminder_notification'
-                                        })
-                                        sent_count += 1
-                                    else:
-                                        errors += 1
-                    
-                    # Save updated data
-                    dm.save_data('reminders', reminders)
-                    dm.save_data('notifications', notifications)
                     
                 except Exception as e:
-                    logger.error(f"Error checking reminders: {str(e)}")
+                    logger.error(f"Database error i påminnelsessjekk: {e}")
+                    all_reminders = []
+                finally:
+                    return_db_connection(conn)
+            else:
+                # Fallback til JSON hvis database ikke er tilgjengelig
+                reminders_data = dm.load_data('reminders')
+                all_reminders = []
+                for r in reminders_data:
+                    if not r.get('completed', False):
+                        try:
+                            reminder_time = datetime.fromisoformat(r['datetime'])
+                            now = datetime.now()
+                            if now < reminder_time <= (now + timedelta(hours=1)):
+                                all_reminders.append((
+                                    r['id'], r['title'], r.get('description', ''),
+                                    r['datetime'], r['user_id'], r.get('email'), 
+                                    30  # Standard varslingstid i minutter
+                                ))
+                        except (ValueError, KeyError) as e:
+                            logger.error(f"Error parsing reminder data: {e}")
             
-            # Log memory usage after
+            # Send varsel for hver påminnelse
+            for reminder in all_reminders:
+                try:
+                    reminder_id, title, description, due_date, user_id, email, notify_mins = reminder
+                    
+                    # Beregn tid til påminnelse
+                    due_time = datetime.fromisoformat(due_date) if isinstance(due_date, str) else due_date
+                    time_until = (due_time - datetime.now()).total_seconds() / 60
+                    
+                    # Send varsel hvis det er på tide
+                    if time_until <= notify_mins:
+                        send_email(
+                            to=email,
+                            subject=f"Påminnelse: {title}",
+                            template='emails/reminder_notification.html',
+                            reminder={
+                                'title': title,
+                                'description': description,
+                                'datetime': due_time.strftime('%Y-%m-%d %H:%M')
+                            }
+                        )
+                        logger.info(f"Påminnelse sendt til {email} for: {title}")
+                
+                except Exception as e:
+                    logger.error(f"Error sending reminder notification: {e}")
+            
+            # Logg minnebruk etter sjekk
             memory_after = process.memory_info().rss / 1024 / 1024
             logger.info(f"Minnebruk etter påminnelsessjekk: {memory_after:.2f} MB")
             
         except Exception as e:
-            logger.error(f"Error checking reminders: {str(e)}")
+            logger.error(f"Error checking reminders: {e}")
             
+        finally:
+            # Sikre at alle tilkoblinger er lukket
+            if 'conn' in locals():
+                return_db_connection(conn)
 # Initialize scheduler for reminders
 scheduler = BackgroundScheduler()
 scheduler.add_job(
