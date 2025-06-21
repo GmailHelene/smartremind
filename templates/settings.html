@@ -3,10 +3,12 @@
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8">
-        <div class="card">            <div class="card-header">
+        <div class="card" style="position: relative; z-index: 100;">
+            <div class="card-header">
                 <h3>Appinnstillinger</h3>
             </div>
-            <div class="card-body">                <form method="POST" action="{{ url_for('set_mode') }}">
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('set_mode') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label for="app_mode" class="form-label">Appmodus</label>
@@ -18,44 +20,46 @@
                             <option value="DARK" {% if app_mode == 'DARK' %}selected{% endif %}>Mørk modus</option>
                         </select>
                     </div>
-                    
+
                     <div class="mb-3">
                         <h4>App Mode Features</h4>
-                        <div class="card mb-2">                            <div class="card-body">
+                        <div class="card mb-2">
+                            <div class="card-body">
                                 <h5>Standard</h5>
                                 <p>Standardgrensesnitt med alle funksjoner aktivert.</p>
                             </div>
-                        </div>                        <div class="card mb-2">
+                        </div>
+                        <div class="card mb-2">
                             <div class="card-body">
                                 <h5>ADHD-Vennlig</h5>
                                 <p>Høy kontrast, forenklet grensesnitt, visuelle indikatorer og reduserte distraksjoner.</p>
                             </div>
-                        </div>                        <div class="card mb-2">
+                        </div>
+                        <div class="card mb-2">
                             <div class="card-body">
                                 <h5>Stillemodus</h5>
                                 <p>Deaktiverer lyder, vibrasjoner og påtrengende varsler.</p>
                             </div>
-                        </div>                        <div class="card mb-2">
+                        </div>
+                        <div class="card mb-2">
                             <div class="card-body">
                                 <h5>Fokusmodus</h5>
                                 <p>Forenklet grensesnitt som bare viser viktig informasjon for å hjelpe deg med å holde fokus.</p>
                             </div>
-                        </div>                        <div class="card mb-2">
+                        </div>
+                        <div class="card mb-2">
                             <div class="card-body">
                                 <h5>Mørk modus</h5>
                                 <p>Mørkt fargetema som er lettere for øynene i miljøer med lite lys.</p>
                             </div>
                         </div>
                     </div>
-                      <div class="d-grid">
+                    <div class="d-grid">
                         <button type="submit" class="btn btn-primary">Lagre innstillinger</button>
                     </div>
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Lagre innstillinger
-                        </button>
-                      </div>
-                        <button type="submit" class="btn btn-primary">Lagre innstillinger</button>
-                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Lagre innstillinger
+                    </button>
                 </form>
             </div>
         </div>

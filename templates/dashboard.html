@@ -403,6 +403,63 @@
             </div>
         </div>
     </div>
+
+    <!-- Boards Section -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white">
+                    <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                        <li class="nav-item">
+                            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#reminders" type="button">Påminnelser</button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#noteboard" type="button">Notater</button>
+                        </li>
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content">
+                        <!-- Reminders Tab -->
+                        <div class="tab-pane fade show active" id="reminders">
+                            <!-- Loading State -->
+                            <div id="reminders-loading" class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Laster...</span>
+                                </div>
+                                <p class="mt-2">Laster påminnelser...</p>
+                            </div>
+                            <!-- Empty State -->
+                            <div id="no-reminders" class="text-center py-5 d-none">
+                                <i class="fas fa-calendar-check fa-3x text-muted mb-3"></i>
+                                <p>Ingen påminnelser å vise.</p>
+                            </div>
+                            <!-- Reminders List -->
+                            <div id="reminders-list" class="list-group list-group-flush"></div>
+                        </div>
+                        
+                        <!-- Notes Tab -->
+                        <div class="tab-pane fade" id="noteboard">
+                            <!-- Loading State -->
+                            <div id="notes-loading" class="text-center py-5">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Laster...</span>
+                                </div>
+                                <p class="mt-2">Laster notater...</p>
+                            </div>
+                            <!-- Empty State -->
+                            <div id="no-notes" class="text-center py-5 d-none">
+                                <i class="fas fa-sticky-note fa-3x text-muted mb-3"></i>
+                                <p>Ingen notater å vise.</p>
+                            </div>
+                            <!-- Notes List -->
+                            <div id="notes-list" class="list-group list-group-flush"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block styles %}
