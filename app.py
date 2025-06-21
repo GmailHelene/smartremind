@@ -386,56 +386,30 @@ def check_reminders_for_notifications():
             
             # Hent påminnelser fra database
             conn = get_db_connection()
-            if conn:
-                try:
-                    cur = conn.cursor()
-                    cur.execute("""
-                        SELECT r.id, r.title, r.description, r.datetime, r.user_id, 
-                               u.email, u.notification_time
-                        FROM reminders r
-                        JOIN users u ON r.user_id = u.id
-                        WHERE r.completed = FALSE 
-                        AND datetime(r.datetime) > datetime('now')
-                        AND datetime(r.datetime) <= datetime('now', '+1 hour')
-                    """)
+            if not conn:
+                logger.error("Kunne ikke koble til database")
+                return
+                
+            try:
+                cur = conn.cursor()
+                # Hent påminnelser som nærmer seg forfallstid
+                cur.execute("""
+                    SELECT r.id, r.user_id, r.title, r.description, r.datetime, r.priority,
+                           u.email, u.notification_time
+                    FROM reminders r
+                    JOIN users u ON r.user_id = u.id
+                    WHERE r.completed = 0
+                    AND datetime(r.datetime) > datetime('now')
+                    AND datetime(r.datetime) <= datetime('now', '+1 hour')
+                """)
+                
+                all_reminders = cur.fetchall()
+                
+                for reminder in all_reminders:
+                    reminder_id, user_id, title, description, due_time, priority, email, notif_time = reminder
                     
-                    all_reminders = cur.fetchall()
-                    cur.close()
-                    
-                except Exception as e:
-                    logger.error(f"Database error i påminnelsessjekk: {e}")
-                    all_reminders = []
-                finally:
-                    return_db_connection(conn)
-            else:
-                # Fallback til JSON hvis database ikke er tilgjengelig
-                reminders_data = dm.load_data('reminders')
-                all_reminders = []
-                for r in reminders_data:
-                    if not r.get('completed', False):
-                        try:
-                            reminder_time = datetime.fromisoformat(r['datetime'])
-                            now = datetime.now()
-                            if now < reminder_time <= (now + timedelta(hours=1)):
-                                all_reminders.append((
-                                    r['id'], r['title'], r.get('description', ''),
-                                    r['datetime'], r['user_id'], r.get('email'), 
-                                    30  # Standard varslingstid i minutter
-                                ))
-                        except (ValueError, KeyError) as e:
-                            logger.error(f"Error parsing reminder data: {e}")
-            
-            # Send varsel for hver påminnelse
-            for reminder in all_reminders:
-                try:
-                    reminder_id, title, description, due_date, user_id, email, notify_mins = reminder
-                    
-                    # Beregn tid til påminnelse
-                    due_time = datetime.fromisoformat(due_date) if isinstance(due_date, str) else due_date
-                    time_until = (due_time - datetime.now()).total_seconds() / 60
-                    
-                    # Send varsel hvis det er på tide
-                    if time_until <= notify_mins:
+                    # Send e-post
+                    try:
                         send_email(
                             to=email,
                             subject=f"Påminnelse: {title}",
@@ -443,20 +417,28 @@ def check_reminders_for_notifications():
                             reminder={
                                 'title': title,
                                 'description': description,
-                                'datetime': due_time.strftime('%Y-%m-%d %H:%M')
+                                'datetime': due_time,
+                                'priority': priority
                             }
                         )
                         logger.info(f"Påminnelse sendt til {email} for: {title}")
+                    except Exception as mail_error:
+                        logger.error(f"Kunne ikke sende påminnelse til {email}: {mail_error}")
                 
-                except Exception as e:
-                    logger.error(f"Error sending reminder notification: {e}")
+                cur.close()
+                
+            except sqlite3.Error as db_error:
+                logger.error(f"Database error i påminnelsessjekk: {db_error}")
+                
+            finally:
+                return_db_connection(conn)
             
             # Logg minnebruk etter sjekk
             memory_after = process.memory_info().rss / 1024 / 1024
             logger.info(f"Minnebruk etter påminnelsessjekk: {memory_after:.2f} MB")
             
         except Exception as e:
-            logger.error(f"Error checking reminders: {e}")
+            logger.error(f"Error checking reminders: {str(e)}")
             
         finally:
             # Sikre at alle tilkoblinger er lukket
