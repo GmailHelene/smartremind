@@ -323,77 +323,158 @@ def load_user(user_id):
 def send_email(to, subject, template=None, html_content=None, **kwargs):
     """Send email with template or direct HTML"""
     try:
-        if not app.config['MAIL_USERNAME'] or not app.config['MAIL_PASSWORD']:
-            logger.warning(f"Email not sent: Missing MAIL_USERNAME or MAIL_PASSWORD")
+        if not app.config.get('MAIL_USERNAME') or not app.config.get('MAIL_PASSWORD'):
+            logger.warning("E-post ikke sendt: Mangler MAIL_USERNAME eller MAIL_PASSWORD i konfigurasjonen")
             return False
         
-        # Email validation
-        if not to or (isinstance(to, str) and '@' not in to) or (isinstance(to, list) and not all('@' in recipient for recipient in to)):
-            logger.warning(f"Invalid email address: {to}")
+        # E-postvalidering
+        if not to:
+            logger.warning("E-post ikke sendt: Ingen mottaker spesifisert")
             return False
+        
+        recipients = [to] if isinstance(to, str) else to
+        invalid_emails = [email for email in recipients if '@' not in email]
+        if invalid_emails:
+            logger.warning(f"Ugyldige e-postadresser: {invalid_emails}")
+            return False
+        
+        # Opprett e-post
+        try:
+            msg = Message(
+                subject=subject,
+                recipients=recipients,
+                sender=app.config.get('MAIL_DEFAULT_SENDER') or app.config.get('MAIL_USERNAME')
+            )
             
-        msg = Message(
-            subject=subject,
-            recipients=[to] if isinstance(to, str) else to,
-            sender=app.config['MAIL_DEFAULT_SENDER'] or app.config['MAIL_USERNAME']
-        )
-        
-        if template:
-            msg.html = render_template(template, **kwargs)
-        elif html_content:
-            msg.html = html_content
-        else:
-            logger.error("Email missing both template and HTML content")
+            if template:
+                try:
+                    msg.html = render_template(template, **kwargs)
+                except Exception as e:
+                    logger.error(f"Feil ved rendering av e-postmal {template}: {e}")
+                    return False
+            elif html_content:
+                msg.html = html_content
+            else:
+                logger.error("E-post mangler både mal og HTML-innhold")
+                return False
+            
+            # Send e-posten
+            mail.send(msg)
+            logger.info(f"E-post sendt til {to}: {subject}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Feil ved oppretting av e-post: {e}")
             return False
-              # Send the email
-        mail.send(msg)
-        logger.info(f"Email sent to {to}: {subject}")
-        return True
         
     except Exception as e:
-        logger.error(f"Error sending email to {to}: {e}")
+        logger.error(f"Feil ved sending av e-post til {to}: {e}")
         return False
 
 def check_reminders_for_notifications():
-    """Check reminders and send notifications with memory logging"""
+    """Sjekk påminnelser og send varsler med minnelogging"""
     with app.app_context():
         try:
-            # Log memory usage
+            # Logg minnebruk
             process = psutil.Process()
             memory_mb = process.memory_info().rss / 1024 / 1024
-            logger.info(f"Memory usage before reminder check: {memory_mb:.2f} MB")
+            logger.info(f"Minnebruk før påminnelsessjekk: {memory_mb:.2f} MB")
             
             now = datetime.now()
             notification_time = now + timedelta(minutes=app.config['NOTIFICATION_ADVANCE_MINUTES'])
             
-            reminders = dm.load_data('reminders')
-            shared_reminders = dm.load_data('shared_reminders')
-            notifications = dm.load_data('notifications')
+            # Hent data
+            conn = get_db_connection()
+            reminders_to_notify = []
             
-            sent_notifications = {n['reminder_id'] for n in notifications}
-            all_reminders = []
+            if conn:
+                try:
+                    cur = conn.cursor()
+                    # Hent påminnelser som skal varsles om
+                    cur.execute("""
+                        SELECT r.id, r.title, r.description, r.date, u.email, u.notification_advance
+                        FROM reminders r
+                        JOIN users u ON r.user_id = u.id
+                        WHERE r.completed = 0 
+                        AND r.notification_sent = 0
+                        AND u.email_notifications = 1
+                        AND r.date > datetime('now')
+                        AND r.date <= datetime('now', '+' || ? || ' minutes')
+                    """, (app.config['NOTIFICATION_ADVANCE_MINUTES'],))
+                    
+                    reminders_to_notify = cur.fetchall()
+                    cur.close()
+                except Exception as e:
+                    logger.error(f"Database error i påminnelsessjekk: {e}")
+                finally:
+                    return_db_connection(conn)
             
-            # Process reminders
-            for reminder in reminders:
-                if not reminder['completed'] and reminder['id'] not in sent_notifications:
-                    try:
-                        reminder_dt = datetime.fromisoformat(reminder['datetime'].replace(' ', 'T'))
-                        if now <= reminder_dt <= notification_time:
-                            if reminder['user_id'] and '@' in reminder['user_id']:
-                                all_reminders.append((reminder, reminder['user_id']))
-                    except (ValueError, KeyError) as e:
-                        logger.warning(f"Invalid reminder datetime: {e}")
+            # Fallback til JSON hvis databasen ikke er tilgjengelig
+            if not conn:
+                reminders = dm.load_data('reminders')
+                for reminder in reminders:
+                    if not reminder.get('completed') and not reminder.get('notification_sent'):
+                        try:
+                            reminder_dt = datetime.fromisoformat(reminder['datetime'].replace(' ', 'T'))
+                            if now <= reminder_dt <= notification_time:
+                                user = User.get_by_email(reminder['user_id'])
+                                if user and getattr(user, 'email_notifications', True):
+                                    reminders_to_notify.append((
+                                        reminder['id'],
+                                        reminder['title'],
+                                        reminder['description'],
+                                        reminder['datetime'],
+                                        user.email,
+                                        getattr(user, 'notification_advance', app.config['NOTIFICATION_ADVANCE_MINUTES'])
+                                    ))
+                        except Exception as e:
+                            logger.error(f"Feil ved prosessering av påminnelse {reminder.get('id')}: {e}")
             
-            # Process shared reminders
-            for reminder in shared_reminders:
-                if not reminder['completed'] and reminder['id'] not in sent_notifications:
-                    try:
-                        reminder_dt = datetime.fromisoformat(reminder['datetime'].replace(' ', 'T'))
-                        if now <= reminder_dt <= notification_time:
-                            if reminder['shared_with'] and '@' in reminder['shared_with']:
-                                all_reminders.append((reminder, reminder['shared_with']))
-                    except (ValueError, KeyError) as e:
-                        logger.warning(f"Invalid shared reminder datetime: {e}")
+            # Send varsler
+            notifications_sent = 0
+            for reminder in reminders_to_notify:
+                try:
+                    reminder_id, title, description, date, email, advance = reminder
+                    
+                    # Send e-postvarsel
+                    sent = send_email(
+                        to=email,
+                        subject=f"Påminnelse: {title}",
+                        template='emails/reminder_notification.html',
+                        reminder={
+                            'title': title,
+                            'description': description,
+                            'datetime': date
+                        }
+                    )
+                    
+                    if sent:
+                        notifications_sent += 1
+                        # Marker påminnelsen som varslet
+                        if conn:
+                            try:
+                                cur = conn.cursor()
+                                cur.execute("UPDATE reminders SET notification_sent = 1 WHERE id = ?", (reminder_id,))
+                                conn.commit()
+                                cur.close()
+                            except Exception as e:
+                                logger.error(f"Kunne ikke oppdatere notification_sent status: {e}")
+                        else:
+                            # Oppdater JSON
+                            reminders = dm.load_data('reminders')
+                            for r in reminders:
+                                if r['id'] == reminder_id:
+                                    r['notification_sent'] = True
+                                    break
+                            dm.save_data('reminders', reminders)
+                    
+                except Exception as e:
+                    logger.error(f"Feil ved sending av varsel for påminnelse {reminder_id}: {e}")
+            
+            if notifications_sent > 0:
+                logger.info(f"Sendt {notifications_sent} varsler")
+              # Logg minnebruk etter ferdig            memory_mb = process.memory_info().rss / 1024 / 1024
+            logger.info(f"Minnebruk etter påminnelsessjekk: {memory_mb:.2f} MB")
             
             # Send notifications (limit to 5 per run to prevent memory issues)
             sent_count = 0
@@ -1476,8 +1557,29 @@ def set_mode():
         return redirect(url_for('settings'))
     
     try:
-        current_user.app_mode = mode
-        flash('Modus endret til: ' + mode, 'success')
+        # Oppdater i database
+        conn = get_db_connection()
+        if conn:
+            try:
+                cur = conn.cursor()
+                cur.execute('UPDATE users SET app_mode = ? WHERE id = ?', (mode, current_user.id))
+                conn.commit()
+                cur.close()
+            except Exception as e:
+                logger.error(f"Database error setting mode: {e}")
+            finally:
+                return_db_connection(conn)
+        
+        # Oppdater i JSON
+        users = dm.load_data('users')
+        if current_user.id in users:
+            users[current_user.id]['app_mode'] = mode
+            dm.save_data('users', users)
+        
+        # Oppdater i current_user
+        current_user._app_mode = mode
+        
+        flash(f'Modus endret til: {mode}', 'success')
     except Exception as e:
         logger.error(f"Error setting mode: {e}")
         flash('Kunne ikke endre modus', 'error')
@@ -1485,6 +1587,52 @@ def set_mode():
     return redirect(request.referrer or url_for('dashboard'))
 
 # Oppdater User-klassen
+@app.route('/api/reminders')
+@login_required
+def get_reminders_api():
+    """API for å hente påminnelser for bruk med JavaScript"""
+    try:
+        # Hent brukerens egne påminnelser
+        my_reminders = get_user_reminders(current_user.id)
+        
+        # Hent påminnelser delt med brukeren
+        shared_reminders = get_shared_reminders(current_user.id)
+        
+        return jsonify({
+            'own_reminders': my_reminders,
+            'shared_reminders': shared_reminders,
+            'status': 'success'
+        })
+    except Exception as e:
+        logger.error(f"Feil ved henting av påminnelser via API: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Kunne ikke hente påminnelser'
+        }), 500
+
+@app.route('/api/notes')
+@login_required
+def get_notes_api():
+    """API for å hente notater for bruk med JavaScript"""
+    try:
+        # Hent brukerens egne notater
+        my_notes = get_user_notes(current_user.id)
+        
+        # Hent notater delt med brukeren
+        shared_notes = get_shared_notes(current_user.id)
+        
+        return jsonify({
+            'own_notes': my_notes,
+            'shared_notes': shared_notes,
+            'status': 'success'
+        })
+    except Exception as e:
+        logger.error(f"Feil ved henting av notater via API: {e}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Kunne ikke hente notater'
+        }), 500
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=True)
