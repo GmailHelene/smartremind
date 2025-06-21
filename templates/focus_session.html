@@ -63,9 +63,13 @@
     background: white;
 }
 
-.session-type-card:hover,
+.session-type-card:hover {
+    transform: translateY(-2px);
+}
+
 .session-type-card.active {
     border-color: #2E86AB;
+    background: #f0f8ff;
     box-shadow: 0 4px 12px rgba(46, 134, 171, 0.2);
     transform: translateY(-2px);
 }
@@ -108,7 +112,6 @@
 .history-item {
     padding: 1rem;
     border-bottom: 1px solid #e0e0e0;
-}
     border-radius: 15px;
     text-align: center;
     cursor: pointer;
@@ -129,6 +132,8 @@
     width: 200px;
     height: 200px;
     margin: 0 auto;
+    position: relative;
+    transform: rotate(-90deg);
 }
 
 .progress-ring-circle {
@@ -140,7 +145,7 @@
     cy: 100;
     stroke-dasharray: 565.48;
     stroke-dashoffset: 565.48;
-    transition: stroke-dashoffset 1s ease;
+    transition: stroke-dashoffset 0.35s ease-in-out;
 }
 </style>
 {% endblock %}

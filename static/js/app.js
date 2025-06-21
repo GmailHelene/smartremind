@@ -7,14 +7,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Register service worker
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', function() {
-            navigator.serviceWorker.register('/sw.js')
+            navigator.serviceWorker.register('/static/sw.js')
                 .then(registration => {
-                    console.log('Service Worker registered with scope:', registration.scope);
+                    console.log('Service Worker registrert med scope:', registration.scope);
                     
                     // Check for updates
                     registration.addEventListener('updatefound', () => {
                         const newWorker = registration.installing;
-                        console.log('Service Worker update found!');
+                        console.log('Service Worker oppdatering funnet!');
                         
                         newWorker.addEventListener('statechange', () => {
                             if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
@@ -25,35 +25,65 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                 })
                 .catch(error => {
-                    console.error('Service Worker registration failed:', error);
+                    console.error('Service Worker registrering feilet:', error);
                 });
         });
     }
     
-    // Install prompt
+    // Install prompt handling
     let deferredPrompt;
+    const installPrompt = document.querySelector('.install-prompt');
     const addBtn = document.querySelector('.add-to-home');
+    
+    // Hide install prompt by default
+    if (installPrompt) {
+        installPrompt.style.display = 'none';
+    }
     
     window.addEventListener('beforeinstallprompt', (e) => {
         // Prevent Chrome 67 and earlier from automatically showing the prompt
         e.preventDefault();
         // Stash the event so it can be triggered later
         deferredPrompt = e;
-        // Update UI to notify the user they can add to home screen
+        
+        // Show install prompt if not installed
+        if (installPrompt && !isAppInstalled()) {
+            installPrompt.style.display = 'block';
+        }
+        
         if (addBtn) {
-            addBtn.style.display = 'block';
-            
-            addBtn.addEventListener('click', () => {
+            addBtn.addEventListener('click', async () => {
+                // Hide install prompt
+                installPrompt.style.display = 'none';
+                
                 // Show the prompt
                 deferredPrompt.prompt();
-                // Wait for the user to respond to the prompt
-                deferredPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        console.log('User accepted the A2HS prompt');
+                
+                try {
+                    // Wait for the user to respond to the prompt
+                    const { outcome } = await deferredPrompt.userChoice;
+                    console.log(`User ${outcome} app installation`);
+                    
+                    if (outcome === 'accepted') {
+                        console.log('App installert');
+                        localStorage.setItem('appInstalled', 'true');
                     }
+                    
+                    // Clear the deferredPrompt
                     deferredPrompt = null;
-                });
+                } catch (error) {
+                    console.error('Feil under app-installasjon:', error);
+                }
             });
+        }
+    });
+    
+    // Listen for successful installation
+    window.addEventListener('appinstalled', (evt) => {
+        console.log('App installert vellykket');
+        localStorage.setItem('appInstalled', 'true');
+        if (installPrompt) {
+            installPrompt.style.display = 'none';
         }
     });
     
@@ -111,13 +141,50 @@ function updateOnlineStatus() {
 }
 
 function showUpdateNotification() {
+    // Show update notification to user
     const notification = document.createElement('div');
     notification.className = 'update-notification';
     notification.innerHTML = `
-        <p>En ny versjon er tilgjengelig!</p>
-        <button onclick="window.location.reload()">Oppdater nå</button>
+        <div class="alert alert-info alert-dismissible fade show" role="alert">
+            <strong>Oppdatering tilgjengelig!</strong> 
+            En ny versjon av appen er tilgjengelig. 
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            <button onclick="location.reload()" class="btn btn-primary btn-sm ms-2">
+                Oppdater nå
+            </button>
+        </div>
     `;
-    document.body.appendChild(notification);
+    document.body.insertBefore(notification, document.body.firstChild);
+}
+
+function isAppInstalled() {
+    // Check if app is installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+        return true;
+    }
+    return localStorage.getItem('appInstalled') === 'true';
+}
+
+// Handle offline/online status
+window.addEventListener('online', function() {
+    document.body.classList.remove('offline');
+    showConnectivityStatus('online');
+});
+
+window.addEventListener('offline', function() {
+    document.body.classList.add('offline');
+    showConnectivityStatus('offline');
+});
+
+function showConnectivityStatus(status) {
+    const statusDiv = document.createElement('div');
+    statusDiv.className = `connectivity-status ${status}`;
+    statusDiv.innerHTML = status === 'online' 
+        ? '<i class="fas fa-wifi"></i> Du er tilkoblet igjen'
+        : '<i class="fas fa-wifi-slash"></i> Du er offline';
+    
+    document.body.appendChild(statusDiv);
+    setTimeout(() => statusDiv.remove(), 3000);
 }
 
 async function syncOfflineData() {
@@ -128,18 +195,5 @@ async function syncOfflineData() {
         } catch (err) {
             console.error('Background sync failed:', err);
         }
-    }
-}{
-    const indicator = document.getElementById('connection-indicator');
-    if (!indicator) return;
-    
-    if (navigator.onLine) {
-        indicator.classList.remove('offline');
-        indicator.classList.add('online');
-        indicator.querySelector('.status-text').textContent = 'Online';
-    } else {
-        indicator.classList.remove('online');
-        indicator.classList.add('offline');
-        indicator.querySelector('.status-text').textContent = 'Offline';
     }
 }
